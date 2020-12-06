@@ -76,7 +76,7 @@ func main() {
 		case "user":
 			actionUser(client, splited)
 		case "send":
-			actionSend(httpClient, client, address, splited)
+			actionSend(httpClient, client, address)
 		case "recv":
 			actionRecv(httpClient, client, address, splited)
 		default:
@@ -151,7 +151,7 @@ func actionUser(client *gp.Client, splited []string) {
 	}
 }
 
-func actionSend(httpClient *http.Client, client *gp.Client, address string, splited []string) {
+func actionSend(httpClient *http.Client, client *gp.Client, address string) {
 	var result Resp
 	if client.Private() == nil {
 		fmt.Println("error: client is nil\n")
@@ -269,18 +269,18 @@ func actionRecv(httpClient *http.Client, client *gp.Client, address string, spli
 			return
 		}
 		pack := gp.DeserializePackage(result.Result)
-		decPack := client.Decrypt(pack)
-		if decPack == nil {
+		pack = client.Decrypt(pack)
+		if pack == nil {
 			fmt.Println("error: pack is nil\n")
 			return
 		}
-		sender := gp.ParsePublic(decPack.Head.Sender)
+		sender := gp.ParsePublic(pack.Head.Sender)
 		if sender == nil {
 			fmt.Println("error: parse public key\n")
 			return
 		}
 		fmt.Printf("From: %s\nTitle: '%s'\nMessage: '%s'\n%s\n%s\n\n", 
-			gp.HashPublic(sender), decPack.Head.Title, decPack.Body.Data,
-			"---------------------------------", decPack.Head.Sender)
+			gp.HashPublic(sender), pack.Head.Title, pack.Body.Data,
+			"---------------------------------", pack.Head.Sender)
 	}
 }
