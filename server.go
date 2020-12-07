@@ -8,6 +8,10 @@ import (
 	gp "github.com/number571/gopeer"
 )
 
+const (
+	MAXSIZE = 32 * (1 << 20) // 32MiB
+)
+
 var (
     DBptr *DB
 )
@@ -49,25 +53,29 @@ func emailSendPage(w http.ResponseWriter, r *http.Request) {
 		response(w, 1, "error: method != POST")
 		return
 	}
+	if r.ContentLength > MAXSIZE {
+		response(w, 2, "error: max size")
+		return
+	}
 	err := json.NewDecoder(r.Body).Decode(&req)
 	if err != nil {
-		response(w, 2, "error: parse json")
+		response(w, 3, "error: parse json")
 		return
 	}
 	pack := gp.DeserializePackage(req.Data)
 	if pack == nil {
-		response(w, 3, "error: deserialize package")
+		response(w, 4, "error: deserialize package")
 		return
 	}
 	hash := gp.Base64Decode(pack.Body.Hash)
 	powd := gp.Get("POWS_DIFF").(uint)
 	if !gp.ProofIsValid(hash, powd, pack.Body.Npow) {
-		response(w, 4, "error: proof of work")
+		response(w, 5, "error: proof of work")
 		return
 	}
 	err = DBptr.SetEmail(req.From, req.To, pack.Body.Hash, req.Data)
 	if err != nil {
-		response(w, 5, "error: save email")
+		response(w, 6, "error: save email")
 		return
 	}
 	response(w, 0, "success: email saved")
@@ -84,9 +92,13 @@ func emailRecvPage(w http.ResponseWriter, r *http.Request) {
 		response(w, 1, "error: method != POST")
 		return
 	}
+	if r.ContentLength > MAXSIZE {
+		response(w, 2, "error: max size")
+		return
+	}
 	err := json.NewDecoder(r.Body).Decode(&req)
 	if err != nil {
-		response(w, 2, "error: parse json")
+		response(w, 3, "error: parse json")
 		return
 	}
 	switch req.Mode {

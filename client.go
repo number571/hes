@@ -80,7 +80,7 @@ func main() {
 		case "recv":
 			actionRecv(httpClient, client, address, splited)
 		default:
-			fmt.Println("error: command undefined")
+			fmt.Println("error: command undefined\n")
 		}
 	}
 }
