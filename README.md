@@ -41,7 +41,6 @@ $ ./client -address="localhost:8080"
 /* data = encrypt(email) */
 CREATE TABLE IF NOT EXISTS emails (
 	id INTEGER,
-	sender VARCHAR(255),
 	receiver VARCHAR(255),
 	hash VARCHAR(255) UNIQUE,
 	data TEXT,

@@ -45,9 +45,8 @@ func indexPage(w http.ResponseWriter, r *http.Request) {
 func emailSendPage(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	var req struct {
-		From string `json:"from"`
-		To 	 string `json:"to"`
-		Data string `json:"data"`
+		Receiver string `json:"receiver"`
+		Data 	 string `json:"data"`
 	}
 	if r.Method != "POST" {
 		response(w, 1, "error: method != POST")
@@ -73,7 +72,7 @@ func emailSendPage(w http.ResponseWriter, r *http.Request) {
 		response(w, 5, "error: proof of work")
 		return
 	}
-	err = DBptr.SetEmail(req.From, req.To, pack.Body.Hash, req.Data)
+	err = DBptr.SetEmail(req.Receiver, pack.Body.Hash, req.Data)
 	if err != nil {
 		response(w, 6, "error: save email")
 		return

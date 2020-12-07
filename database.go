@@ -19,7 +19,6 @@ func DBInit(filename string) *DB {
 	_, err = db.Exec(`
 CREATE TABLE IF NOT EXISTS emails (
 	id INTEGER,
-	sender VARCHAR(255),
 	receiver VARCHAR(255),
 	hash VARCHAR(255) UNIQUE,
 	data TEXT,
@@ -34,12 +33,11 @@ CREATE TABLE IF NOT EXISTS emails (
 	}
 }
 
-func (db *DB) SetEmail(sender, receiver, hash, data string) error {
+func (db *DB) SetEmail(receiver, hash, data string) error {
 	db.mtx.Lock()
 	defer db.mtx.Unlock()
 	_, err := db.ptr.Exec(
-		"INSERT INTO emails (sender, receiver, hash, data) VALUES ($1, $2, $3, $4)", 
-		sender,
+		"INSERT INTO emails (receiver, hash, data) VALUES ($1, $2, $3)", 
 		receiver,
 		hash,
 		data,

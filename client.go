@@ -22,9 +22,8 @@ type Resp struct {
 }
 
 type ReqSend struct {
-	From string `json:"from"`
-	To 	 string `json:"to"`
-	Data string `json:"data"`
+	Receiver string `json:"receiver"`
+	Data 	 string `json:"data"`
 }
 
 type ReqRecv struct {
@@ -176,8 +175,7 @@ func actionSend(httpClient *http.Client, client *gp.Client, address string) {
 	pack := gp.NewPackage(title, message)
 	pack = client.Encrypt(receiver, pack)
 	req := serialize(ReqSend{
-		From: client.HashPublic(),
-		To: gp.HashPublic(receiver),
+		Receiver: gp.HashPublic(receiver),
 		Data: gp.SerializePackage(pack),
 	})
 	resp, err := httpClient.Post(
@@ -279,8 +277,8 @@ func actionRecv(httpClient *http.Client, client *gp.Client, address string, spli
 			fmt.Println("error: parse public key\n")
 			return
 		}
-		fmt.Printf("From: %s\nTitle: '%s'\nMessage: '%s'\n%s\n%s\n\n", 
-			gp.HashPublic(sender), pack.Head.Title, pack.Body.Data,
-			"---------------------------------", pack.Head.Sender)
+		fmt.Printf("Sender: %s\n%s\nTitle: '%s'\nMessage: '%s'\n\n", 
+			pack.Head.Sender, "---------------------------------",
+			pack.Head.Title, pack.Body.Data)
 	}
 }
