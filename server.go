@@ -1,11 +1,12 @@
 package main
 
 import (
-	"fmt"
-	"flag"
-	"net/http"
 	"encoding/json"
+	"flag"
+	"fmt"
 	gp "github.com/number571/gopeer"
+	"net/http"
+	"strconv"
 )
 
 const (
@@ -13,15 +14,15 @@ const (
 )
 
 var (
-    DBptr *DB
+	DBptr *DB
 )
 
 func init() {
-    DBptr = DBInit("database.db")
-    if DBptr == nil {
-    	panic("error: database init")
-    }
-    fmt.Println("Server is listening...\n")
+	DBptr = DBInit("database.db")
+	if DBptr == nil {
+		panic("error: database init")
+	}
+	fmt.Println("Server is listening...\n")
 }
 
 func main() {
@@ -45,8 +46,8 @@ func indexPage(w http.ResponseWriter, r *http.Request) {
 func emailSendPage(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	var req struct {
-		Receiver string `json:"receiver"`
-		Data 	 string `json:"data"`
+		Recv string `json:"recv"`
+		Data string `json:"data"`
 	}
 	if r.Method != "POST" {
 		response(w, 1, "error: method != POST")
@@ -72,7 +73,7 @@ func emailSendPage(w http.ResponseWriter, r *http.Request) {
 		response(w, 5, "error: proof of work")
 		return
 	}
-	err = DBptr.SetEmail(req.Receiver, pack.Body.Hash, req.Data)
+	err = DBptr.SetEmail(req.Recv, pack.Body.Hash, req.Data)
 	if err != nil {
 		response(w, 6, "error: save email")
 		return
@@ -83,9 +84,8 @@ func emailSendPage(w http.ResponseWriter, r *http.Request) {
 func emailRecvPage(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	var req struct {
-		User string `json:"user"`
+		Recv string `json:"recv"`
 		Mode string `json:"mode"`
-		Numb int `json:"numb"`
 	}
 	if r.Method != "POST" {
 		response(w, 1, "error: method != POST")
@@ -102,18 +102,23 @@ func emailRecvPage(w http.ResponseWriter, r *http.Request) {
 	}
 	switch req.Mode {
 	case "size":
-		response(w, 0, fmt.Sprintf("%d", DBptr.Size(req.User)))
+		response(w, 0, fmt.Sprintf("%d", DBptr.Size(req.Recv)))
 		return
-	case "email":
-		res := DBptr.GetEmail(req.Numb, req.User)
+	default:
+		num, err := strconv.Atoi(req.Mode)
+		if err != nil {
+			response(w, 4, "error: parse int")
+			return
+		}
+		res := DBptr.GetEmail(num, req.Recv)
 		if res == "" {
-			response(w, 4, "error: nothing data")
-			return 
+			response(w, 5, "error: nothing data")
+			return
 		}
 		response(w, 0, res)
-		return 
+		return
 	}
-	response(w, 5, "error: mode undefined")
+	response(w, 6, "error: mode undefined")
 }
 
 func response(w http.ResponseWriter, ret int, res string) {

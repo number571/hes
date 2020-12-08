@@ -1,19 +1,19 @@
 package main
 
 import (
-	"os"
-	"fmt"
-	"time"
-	"flag"
-	"bytes"
 	"bufio"
+	"bytes"
+	"encoding/json"
+	"flag"
+	"fmt"
+	gp "github.com/number571/gopeer"
+	"golang.org/x/net/proxy"
+	"net/http"
+	"net/url"
+	"os"
 	"strconv"
 	"strings"
-	"net/url"
-	"net/http"
-	"encoding/json"
-	"golang.org/x/net/proxy"
-	gp "github.com/number571/gopeer"
+	"time"
 )
 
 type Resp struct {
@@ -22,23 +22,22 @@ type Resp struct {
 }
 
 type ReqSend struct {
-	Receiver string `json:"receiver"`
-	Data 	 string `json:"data"`
+	Recv string `json:"recv"`
+	Data string `json:"data"`
 }
 
 type ReqRecv struct {
-	User string `json:"user"`
+	Recv string `json:"recv"`
 	Mode string `json:"mode"`
-	Numb int `json:"numb"`
 }
 
 func main() {
 	var (
 		httpClient = new(http.Client)
-		client = new(gp.Client)
-		address string
-		message string
-		splited []string
+		client     = new(gp.Client)
+		address    string
+		message    string
+		splited    []string
 	)
 	useTor := flag.Bool("tor", false, "enable socks5 and connect to tor network")
 	addrPtr := flag.String("address", "", "connect to hidden email server")
@@ -59,9 +58,9 @@ func main() {
 			fmt.Println("error: dialer")
 			return
 		}
-		httpClient = &http.Client {
-			Transport: &http.Transport{ Dial: dialer.Dial },
-			Timeout: time.Second * 15,
+		httpClient = &http.Client{
+			Transport: &http.Transport{Dial: dialer.Dial},
+			Timeout:   time.Second * 15,
 		}
 	}
 	for {
@@ -127,11 +126,11 @@ func actionUser(client *gp.Client, splited []string) {
 			fmt.Println("error: parse private key\n")
 			return
 		}
-		*client = *gp.NewClient(priv, func(client *gp.Client, pack *gp.Package){})
+		*client = *gp.NewClient(priv, func(client *gp.Client, pack *gp.Package) {})
 		fmt.Println("success: user loaded\n")
 	case "create":
 		priv := gp.GeneratePrivate(gp.Get("AKEY_SIZE").(uint))
-		*client = *gp.NewClient(priv, func(client *gp.Client, pack *gp.Package){})
+		*client = *gp.NewClient(priv, func(client *gp.Client, pack *gp.Package) {})
 		fmt.Println("success: user created\n")
 	case "public":
 		if client.Private() == nil {
@@ -156,31 +155,31 @@ func actionSend(httpClient *http.Client, client *gp.Client, address string) {
 		fmt.Println("error: client is nil\n")
 		return
 	}
-	recvstr := inputString("[receiver]> ")
+	recvstr := inputString("[recv]> ")
 	receiver := gp.ParsePublic(recvstr)
 	if receiver == nil {
 		fmt.Println("error: parse public key\n")
 		return
 	}
-	title := inputString("[title]> ")
+	title := inputString("[head]> ")
 	if title == "" {
 		fmt.Println("error: title is nil\n")
-		return 
+		return
 	}
-	message := inputString("[message]> ")
+	message := inputString("[body]> ")
 	if title == "" {
 		fmt.Println("error: message is nil\n")
-		return 
+		return
 	}
 	pack := gp.NewPackage(title, message)
 	pack = client.Encrypt(receiver, pack)
 	req := serialize(ReqSend{
-		Receiver: gp.HashPublic(receiver),
+		Recv: gp.HashPublic(receiver),
 		Data: gp.SerializePackage(pack),
 	})
 	resp, err := httpClient.Post(
-		"http://" + address + "/send", 
-		"application/json", 
+		"http://"+address+"/send",
+		"application/json",
 		bytes.NewReader(req),
 	)
 	if err != nil {
@@ -213,12 +212,12 @@ func actionRecv(httpClient *http.Client, client *gp.Client, address string, spli
 	switch splited[1] {
 	case "size":
 		req := serialize(ReqRecv{
-			User: client.HashPublic(),
+			Recv: client.HashPublic(),
 			Mode: "size",
 		})
 		resp, err := httpClient.Post(
-			"http://" + address + "/recv", 
-			"application/json", 
+			"http://"+address+"/recv",
+			"application/json",
 			bytes.NewReader(req),
 		)
 		if err != nil {
@@ -237,19 +236,18 @@ func actionRecv(httpClient *http.Client, client *gp.Client, address string, spli
 		}
 		fmt.Printf("%s\n\n", result.Result)
 	default:
-		num, err := strconv.Atoi(splited[1])
+		_, err := strconv.Atoi(splited[1])
 		if err != nil {
 			fmt.Println("error: parse int\n")
 			return
 		}
 		req := serialize(ReqRecv{
-			User: client.HashPublic(),
-			Mode: "email",
-			Numb: num,
+			Recv: client.HashPublic(),
+			Mode: splited[1],
 		})
 		resp, err := httpClient.Post(
-			"http://" + address + "/recv", 
-			"application/json", 
+			"http://"+address+"/recv",
+			"application/json",
 			bytes.NewReader(req),
 		)
 		if err != nil {
@@ -277,7 +275,7 @@ func actionRecv(httpClient *http.Client, client *gp.Client, address string, spli
 			fmt.Println("error: parse public key\n")
 			return
 		}
-		fmt.Printf("Sender: %s\n%s\nTitle: '%s'\nMessage: '%s'\n\n", 
+		fmt.Printf("Sender: %s\n%s\nTitle: '%s'\nMessage: '%s'\n\n",
 			pack.Head.Sender, "---------------------------------",
 			pack.Head.Title, pack.Body.Data)
 	}

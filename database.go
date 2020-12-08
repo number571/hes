@@ -1,9 +1,9 @@
 package main
 
 import (
-	"sync"
 	"database/sql"
 	_ "github.com/mattn/go-sqlite3"
+	"sync"
 )
 
 type DB struct {
@@ -37,7 +37,7 @@ func (db *DB) SetEmail(receiver, hash, data string) error {
 	db.mtx.Lock()
 	defer db.mtx.Unlock()
 	_, err := db.ptr.Exec(
-		"INSERT INTO emails (receiver, hash, data) VALUES ($1, $2, $3)", 
+		"INSERT INTO emails (receiver, hash, data) VALUES ($1, $2, $3)",
 		receiver,
 		hash,
 		data,
