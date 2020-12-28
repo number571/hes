@@ -126,11 +126,11 @@ func actionUser(client *gp.Client, splited []string) {
 			fmt.Println("error: parse private key\n")
 			return
 		}
-		*client = *gp.NewClient(priv, func(client *gp.Client, pack *gp.Package) {})
+		*client = *gp.NewClient(priv)
 		fmt.Println("success: user loaded\n")
 	case "create":
 		priv := gp.GeneratePrivate(gp.Get("AKEY_SIZE").(uint))
-		*client = *gp.NewClient(priv, func(client *gp.Client, pack *gp.Package) {})
+		*client = *gp.NewClient(priv)
 		fmt.Println("success: user created\n")
 	case "public":
 		if client.Private() == nil {
