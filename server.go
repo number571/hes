@@ -44,7 +44,6 @@ func indexPage(w http.ResponseWriter, r *http.Request) {
 }
 
 func emailSendPage(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Content-Type", "application/json")
 	var req struct {
 		Recv string `json:"recv"`
 		Data string `json:"data"`
@@ -82,10 +81,9 @@ func emailSendPage(w http.ResponseWriter, r *http.Request) {
 }
 
 func emailRecvPage(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Content-Type", "application/json")
 	var req struct {
 		Recv string `json:"recv"`
-		Mode string `json:"mode"`
+		Data string `json:"data"`
 	}
 	if r.Method != "POST" {
 		response(w, 1, "error: method != POST")
@@ -100,12 +98,12 @@ func emailRecvPage(w http.ResponseWriter, r *http.Request) {
 		response(w, 3, "error: parse json")
 		return
 	}
-	switch req.Mode {
+	switch req.Data {
 	case "size":
 		response(w, 0, fmt.Sprintf("%d", DBptr.Size(req.Recv)))
 		return
 	default:
-		num, err := strconv.Atoi(req.Mode)
+		num, err := strconv.Atoi(req.Data)
 		if err != nil {
 			response(w, 4, "error: parse int")
 			return
@@ -122,6 +120,7 @@ func emailRecvPage(w http.ResponseWriter, r *http.Request) {
 }
 
 func response(w http.ResponseWriter, ret int, res string) {
+	w.Header().Set("Content-Type", "application/json")
 	var resp struct {
 		Result string `json:"result"`
 		Return int    `json:"return"`

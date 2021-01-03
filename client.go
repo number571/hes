@@ -21,14 +21,9 @@ type Resp struct {
 	Return int    `json:"return"`
 }
 
-type ReqSend struct {
+type Req struct {
 	Recv string `json:"recv"`
 	Data string `json:"data"`
-}
-
-type ReqRecv struct {
-	Recv string `json:"recv"`
-	Mode string `json:"mode"`
 }
 
 func main() {
@@ -173,7 +168,7 @@ func actionSend(httpClient *http.Client, client *gp.Client, address string) {
 	}
 	pack := gp.NewPackage(title, message)
 	pack = client.Encrypt(receiver, pack)
-	req := serialize(ReqSend{
+	req := serialize(Req{
 		Recv: gp.HashPublic(receiver),
 		Data: gp.SerializePackage(pack),
 	})
@@ -211,9 +206,9 @@ func actionRecv(httpClient *http.Client, client *gp.Client, address string, spli
 	}
 	switch splited[1] {
 	case "size":
-		req := serialize(ReqRecv{
+		req := serialize(Req{
 			Recv: client.HashPublic(),
-			Mode: "size",
+			Data: "size",
 		})
 		resp, err := httpClient.Post(
 			"http://"+address+"/recv",
@@ -241,9 +236,9 @@ func actionRecv(httpClient *http.Client, client *gp.Client, address string, spli
 			fmt.Println("error: parse int\n")
 			return
 		}
-		req := serialize(ReqRecv{
+		req := serialize(Req{
 			Recv: client.HashPublic(),
-			Mode: splited[1],
+			Data: splited[1],
 		})
 		resp, err := httpClient.Post(
 			"http://"+address+"/recv",
