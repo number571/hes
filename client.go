@@ -121,11 +121,11 @@ func actionUser(client *gp.Client, splited []string) {
 			fmt.Println("error: parse private key\n")
 			return
 		}
-		*client = *gp.NewClient(priv)
+		*client = *gp.NewClient(priv, nil)
 		fmt.Println("success: user loaded\n")
 	case "create":
 		priv := gp.GeneratePrivate(gp.Get("AKEY_SIZE").(uint))
-		*client = *gp.NewClient(priv)
+		*client = *gp.NewClient(priv, nil)
 		fmt.Println("success: user created\n")
 	case "public":
 		if client.Private() == nil {
@@ -151,8 +151,8 @@ func actionSend(httpClient *http.Client, client *gp.Client, address string) {
 		return
 	}
 	recvstr := inputString("[recv]> ")
-	receiver := gp.ParsePublic(recvstr)
-	if receiver == nil {
+	recv := gp.ParsePublic(recvstr)
+	if recv == nil {
 		fmt.Println("error: parse public key\n")
 		return
 	}
@@ -167,9 +167,9 @@ func actionSend(httpClient *http.Client, client *gp.Client, address string) {
 		return
 	}
 	pack := gp.NewPackage(title, message)
-	pack = client.Encrypt(receiver, pack)
+	pack = client.Encrypt(recv, pack)
 	req := serialize(Req{
-		Recv: gp.HashPublic(receiver),
+		Recv: gp.HashPublic(recv),
 		Data: gp.SerializePackage(pack),
 	})
 	resp, err := httpClient.Post(

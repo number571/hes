@@ -5,9 +5,17 @@
 ### Characteristics:
 1. End to end encryption;
 2. Supported tor connections;
-3. Symmetric algorithm: AES256-CBC;
-4. Asymmetric algorithm: RSA-[OAEP, PSS];
+3. Symmetric algorithm: AES-CBC;
+4. Asymmetric algorithm: RSA-OAEP, RSA-PSS;
 5. Hash function: SHA256;
+
+### Install:
+```
+$ make install
+> go get github.com/number571/gopeer
+> go get github.com/mattn/go-sqlite3
+> go get golang.org/x/net/proxy
+```
 
 ### Compile and run:
 ```
@@ -36,12 +44,12 @@ $ ./client -address="localhost:8080"
 ### SQL Tables (database.db):
 > Database file is created when the application starts.
 ```sql
-/* sender, receiver = hash(public_key) */
+/* recv = hash(public_key) */
 /* hash = hash(data) */
 /* data = encrypt(email) */
 CREATE TABLE IF NOT EXISTS emails (
 	id INTEGER,
-	receiver VARCHAR(255),
+	recv VARCHAR(255),
 	hash VARCHAR(255) UNIQUE,
 	data TEXT,
 	PRIMARY KEY(id)
