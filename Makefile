@@ -10,4 +10,4 @@ build: gclient.go server.go database.go
 	$(GC) gclient.go
 	$(GC) server.go database.go
 clean:
-	rm -f client.db database.db server gclient
+	rm -f client.db server.db server gclient
