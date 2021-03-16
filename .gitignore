@@ -1,5 +1,4 @@
 server
-client
 gclient
-database.db
+server.db
 client.db
