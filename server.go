@@ -14,32 +14,29 @@ const (
 )
 
 var (
-	DBptr *DB
+	ADDRESS  string
+	DATABASE *DB
 )
 
 func init() {
-	DBptr = DBInit("database.db")
-	if DBptr == nil {
+	addrPtr := flag.String("open", "localhost:8080", "open address for hidden email server")
+	flag.Parse()
+	ADDRESS = *addrPtr
+	DATABASE = NewDB("server.db")
+	if DATABASE == nil {
 		panic("error: database init")
 	}
 	fmt.Println("Server is listening...\n")
 }
 
 func main() {
-	addrPtr := flag.String("address", "", "address of hidden email server")
-	flag.Parse()
-	if *addrPtr == "" {
-		fmt.Println("error: address is nil")
-		return
-	}
 	http.HandleFunc("/", indexPage)
 	http.HandleFunc("/send", emailSendPage)
 	http.HandleFunc("/recv", emailRecvPage)
-	http.ListenAndServe(*addrPtr, nil)
+	http.ListenAndServe(ADDRESS, nil)
 }
 
 func indexPage(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Content-Type", "application/json")
 	response(w, 0, "(HES) Hidden email service. Gopeer based.")
 }
 
@@ -72,7 +69,7 @@ func emailSendPage(w http.ResponseWriter, r *http.Request) {
 		response(w, 5, "error: proof of work")
 		return
 	}
-	err = DBptr.SetEmail(req.Recv, pack.Body.Hash, req.Data)
+	err = DATABASE.SetEmail(req.Recv, pack.Body.Hash, req.Data)
 	if err != nil {
 		response(w, 6, "error: save email")
 		return
@@ -100,7 +97,7 @@ func emailRecvPage(w http.ResponseWriter, r *http.Request) {
 	}
 	switch req.Data {
 	case "size":
-		response(w, 0, fmt.Sprintf("%d", DBptr.Size(req.Recv)))
+		response(w, 0, fmt.Sprintf("%d", DATABASE.Size(req.Recv)))
 		return
 	default:
 		num, err := strconv.Atoi(req.Data)
@@ -108,7 +105,7 @@ func emailRecvPage(w http.ResponseWriter, r *http.Request) {
 			response(w, 4, "error: parse int")
 			return
 		}
-		res := DBptr.GetEmail(num, req.Recv)
+		res := DATABASE.GetEmail(num, req.Recv)
 		if res == "" {
 			response(w, 5, "error: nothing data")
 			return

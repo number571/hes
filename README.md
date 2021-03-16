@@ -1,6 +1,6 @@
 # HES
 
-> Hidden email service. Gopeer based.
+> Hidden email service. Version 1.1.0s.
 
 ### Characteristics:
 1. End to end encryption;
@@ -8,6 +8,9 @@
 3. Symmetric algorithm: AES-CBC;
 4. Asymmetric algorithm: RSA-OAEP, RSA-PSS;
 5. Hash function: SHA256;
+
+### Home page:
+<img src="/images/HES1.png" alt="HomePage"/>
 
 ### Install:
 ```
@@ -17,41 +20,78 @@ $ make install
 > go get golang.org/x/net/proxy
 ```
 
+### Create email page:
+<img src="/images/HES6.png" alt="CreateEmailPage"/>
+
 ### Compile and run:
 ```
 $ make
-> go build client.go
+> go build gclient.go
 > go build server.go database.go
-$ ./server -address=":8080" &
-$ ./client -address="localhost:8080"
+$ ./server -open="localhost:8080" &
+$ ./gclient -open="localhost:7545"
 ```
 
-### Client actions:
-```
-1. exit - close client;
-2. help - commands info;
-3. user - actions:
-3.1. create - generate private key;
-3.2. load - load private key;
-3.3. public - print public key;
-3.4. private - print private key;
-4. send - send email;
-5. recv - actions:
-5.1. size - print number of emails;
-5.2. [number] - print email by number;
-```
+### List of emails page:
+<img src="/images/HES7.png" alt="ListOfEmailsPage"/>
 
 ### SQL Tables (database.db):
-> Database file is created when the application starts.
+> Database files are creates when the application starts.
+
+#### Server side
 ```sql
 /* recv = hash(public_key) */
 /* hash = hash(data) */
 /* data = encrypt(email) */
 CREATE TABLE IF NOT EXISTS emails (
-	id INTEGER,
+	id   INTEGER,
 	recv VARCHAR(255),
 	hash VARCHAR(255) UNIQUE,
 	data TEXT,
 	PRIMARY KEY(id)
 );
 ```
+
+#### Client side
+```sql
+/* !key_pasw = hash(password, salt)^20 */
+/* pasw      = hash(!key_pasw) */
+/* priv      = encrypt[!key_pasw](private_key) */
+CREATE TABLE IF NOT EXISTS users (
+	id   INTEGER,
+	name NVARCHAR(255) UNIQUE,
+	pasw VARCHAR(255),
+	salt VARCHAR(255),
+	priv TEXT,
+	PRIMARY KEY(id)
+);
+/* hash = hash(host, !key_pasw, salt) */
+/* host = encrypt[!key_pasw](host) */
+CREATE TABLE IF NOT EXISTS connects (
+	id      INTEGER,
+	id_user INTEGER,
+	hash    VARCHAR(255) UNIQUE,
+	host    VARCHAR(255),
+	PRIMARY KEY(id),
+	FOREIGN KEY(id_user) REFERENCES users(id) ON DELETE CASCADE
+);
+/* hash  = hash(pack_hash, !key_pasw, salt) */
+/* spubl = encrypt[!key_pasw](public_key) */
+/* sname = encrypt[!key_pasw](nickname) */
+/* head  = encrypt[!key_pasw](title) */
+/* body  = encrypt[!key_pasw](message) */
+CREATE TABLE IF NOT EXISTS emails (
+	id      INTEGER,
+	id_user INTEGER,
+	hash    VARCHAR(255) UNIQUE,
+	spubl   TEXT,
+	sname   VARCHAR(255),
+	head    VARCHAR(255),
+	body    TEXT,
+	PRIMARY KEY(id),
+	FOREIGN KEY(id_user) REFERENCES users(id) ON DELETE CASCADE
+);
+```
+
+### Email page:
+<img src="/images/HES8.png" alt="EmailPage"/>

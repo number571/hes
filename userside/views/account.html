@@ -1,0 +1,21 @@
+{{ define "title" }}
+	Account
+{{ end }}
+
+{{ define "main" }}
+	<div class="form-group">
+		<button type="button" class="btn btn-secondary divtext w-100" disabled>{{ .Auth }}</button>
+	</div>
+	<div class="form-group row">
+		<div class="col-md-6 w-50">
+			<form class="text-center" method="POST" action="/account/private_key">
+				<input type="submit" name="submit" value="Look private key" class="btn btn-success w-100">
+			</form>
+		</div>
+		<div class="col-md-6 w-50">
+			<form class="text-center" method="POST" action="/account/public_key">
+				<input type="submit" name="submit" value="Look public key" class="btn btn-success w-100">
+			</form>
+		</div>
+	</div>
+{{ end }}

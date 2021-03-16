@@ -11,7 +11,7 @@ type DB struct {
 	mtx sync.Mutex
 }
 
-func DBInit(filename string) *DB {
+func NewDB(filename string) *DB {
 	db, err := sql.Open("sqlite3", filename)
 	if err != nil {
 		return nil

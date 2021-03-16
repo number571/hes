@@ -1,0 +1,53 @@
+{{ define "title" }}
+	Network
+{{ end }}
+
+{{ define "main" }}
+	<div class="form-group row">
+		<div class="col-md-4 w-25">
+			<form class="text-center" method="GET" action="/network/write">
+				<input type="submit" name="submit" value="Write" class="btn btn-success w-100">
+			</form>
+		</div>
+		<div class="col-md-4 w-25">
+			<form class="text-center" method="GET" action="/network/connect">
+				<input type="submit" name="submit" value="Connect" class="btn btn-success w-100">
+			</form>
+		</div>
+		<div class="col-md-4 w-50">
+			<form class="text-center" method="POST" action="/network">
+				<input type="submit" name="update" value="Update" class="btn btn-success w-100">
+			</form>
+		</div>
+	</div>
+	{{ range .Emails }}
+		<div class="form-group row">
+			<div class="col-md-9 w-75">
+				<form class="text-center" method="GET" action="/network/read">
+					<input type="hidden" name="email" value="{{ .Id }}">
+					<input type="submit" name="read" value="{{ .SenderName }}:{{ .Head }}" class="btn btn-secondary w-100">
+				</form>
+			</div>
+			<div class="col-md-3 w-25">
+				<form class="text-center" method="POST" action="/network">
+					<input type="hidden" name="email" value="{{ .Hash }}">
+					<input type="submit" name="delete" value="Delete" class="btn btn-danger w-100">
+				</form>
+			</div>
+		</div>
+	{{ end }}
+	<div class="form-group row">
+		<div class="col-md-6 w-50">
+			<form class="text-center" method="GET" action="/network">
+				<input type="hidden" name="num" value="{{ .Page }}">
+				<input {{ if (not .Page) }} disabled {{ end }} type="submit" name="back" value="Back" class="btn btn-info w-100">
+			</form>
+		</div>
+		<div class="col-md-6 w-50">
+			<form class="text-center" method="GET" action="/network">
+				<input type="hidden" name="num" value="{{ .Page }}">
+				<input {{ if (not .Emails) }} disabled {{ end }} type="submit" name="next" value="Next" class="btn btn-info w-100">
+			</form>
+		</div>
+	</div>
+{{ end }}
