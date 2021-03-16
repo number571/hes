@@ -10,7 +10,7 @@
 5. Hash function: SHA256;
 
 ### Home page:
-<img src="/images/HES1.png" alt="HomePage"/>
+<img src="/userside/images/HES1.png" alt="HomePage"/>
 
 ### Install:
 ```
@@ -21,7 +21,7 @@ $ make install
 ```
 
 ### Create email page:
-<img src="/images/HES6.png" alt="CreateEmailPage"/>
+<img src="/userside/images/HES6.png" alt="CreateEmailPage"/>
 
 ### Compile and run:
 ```
@@ -33,7 +33,7 @@ $ ./gclient -open="localhost:7545"
 ```
 
 ### List of emails page:
-<img src="/images/HES7.png" alt="ListOfEmailsPage"/>
+<img src="/userside/images/HES7.png" alt="ListOfEmailsPage"/>
 
 ### SQL Tables (database.db):
 > Database files are creates when the application starts.
@@ -94,4 +94,4 @@ CREATE TABLE IF NOT EXISTS emails (
 ```
 
 ### Email page:
-<img src="/images/HES8.png" alt="EmailPage"/>
+<img src="/userside/images/HES8.png" alt="EmailPage"/>
