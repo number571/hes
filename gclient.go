@@ -203,26 +203,18 @@ func accountPage(w http.ResponseWriter, r *http.Request) {
 }
 
 func accountPublicKeyPage(w http.ResponseWriter, r *http.Request) {
-	if SESSIONS.Get(r) == nil {
-		fmt.Fprint(w, "session is nil")
-		return
-	}
 	user := SESSIONS.Get(r)
 	if user == nil {
-		fmt.Fprint(w, "user undefined")
+		fmt.Fprint(w, "session is nil")
 		return
 	}
 	fmt.Fprint(w, gp.PublicKeyToString(&user.Priv.PublicKey))
 }
 
 func accountPrivateKeyPage(w http.ResponseWriter, r *http.Request) {
-	if SESSIONS.Get(r) == nil {
-		fmt.Fprint(w, "session is nil")
-		return
-	}
 	user := SESSIONS.Get(r)
 	if user == nil {
-		fmt.Fprint(w, "user undefined")
+		fmt.Fprint(w, "session is nil")
 		return
 	}
 	fmt.Fprint(w, gp.PrivateKeyToString(user.Priv))
@@ -254,13 +246,9 @@ func networkPage(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		panic("error: load network.html")
 	}
-	if SESSIONS.Get(r) == nil {
-		http.Redirect(w, r, "/", 302)
-		return
-	}
 	user := SESSIONS.Get(r)
 	if user == nil {
-		fmt.Fprint(w, "user undefined")
+		http.Redirect(w, r, "/", 302)
 		return
 	}
 	if r.Method == "GET" && (r.FormValue("back") != "" || r.FormValue("next") != "") {
@@ -380,13 +368,9 @@ func networkWritePage(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		panic("error: load network.html")
 	}
-	if SESSIONS.Get(r) == nil {
-		http.Redirect(w, r, "/", 302)
-		return
-	}
 	user := SESSIONS.Get(r)
 	if user == nil {
-		fmt.Fprint(w, "user undefined")
+		http.Redirect(w, r, "/", 302)
 		return
 	}
 	if r.Method == "POST" {
@@ -451,13 +435,9 @@ func networkReadPage(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		panic("error: load read.html")
 	}
-	if SESSIONS.Get(r) == nil {
-		http.Redirect(w, r, "/", 302)
-		return
-	}
 	user := SESSIONS.Get(r)
 	if user == nil {
-		fmt.Fprint(w, "user undefined")
+		http.Redirect(w, r, "/", 302)
 		return
 	}
 	var email *us.Email
@@ -489,13 +469,9 @@ func networkConnectPage(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		panic("error: load network.html")
 	}
-	if SESSIONS.Get(r) == nil {
-		http.Redirect(w, r, "/", 302)
-		return
-	}
 	user := SESSIONS.Get(r)
 	if user == nil {
-		fmt.Fprint(w, "user undefined")
+		http.Redirect(w, r, "/", 302)
 		return
 	}
 	if r.Method == "POST" {
