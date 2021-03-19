@@ -6,16 +6,17 @@ import (
 	"encoding/json"
 	"flag"
 	"fmt"
-	"image/png"
-	"strconv"
-	gp "github.com/number571/gopeer"
-	"golang.org/x/net/proxy"
 	"github.com/boombuler/barcode"
 	"github.com/boombuler/barcode/qr"
+	gp "github.com/number571/gopeer"
+	"golang.org/x/net/proxy"
 	"html/template"
+	"image/png"
 	"net/http"
 	"net/url"
 	"os"
+	"strconv"
+	"strings"
 	"time"
 )
 
@@ -44,10 +45,10 @@ var (
 )
 
 func init() {
-	torUsed  := flag.Bool("tor", false, "enable socks5 and connect to tor network")
-	addrUsed := flag.String("open", "localhost:7545", "open address for gui application")
+	torUsed := flag.Bool("tor", false, "enable socks5 and connect to tor network")
+	addrPtr := flag.String("open", "localhost:7545", "open address for gui application")
 	flag.Parse()
-	OPENADDR = *addrUsed
+	OPENADDR = *addrPtr
 	if *torUsed {
 		socks5, err := url.Parse("socks5://127.0.0.1:9050")
 		if err != nil {
@@ -62,6 +63,7 @@ func init() {
 			Timeout:   time.Second * 15,
 		}
 	}
+	fmt.Println("Client is listening...\n")
 }
 
 func main() {
@@ -192,7 +194,7 @@ func accountPage(w http.ResponseWriter, r *http.Request) {
 	type AccountTemplateResult struct {
 		TemplateResult
 		PublicKey  string
-		PrivateKey string 
+		PrivateKey string
 	}
 	retcod, result := makeResult(RET_SUCCESS, "")
 	t, err := template.ParseFiles(
@@ -223,11 +225,11 @@ func accountPage(w http.ResponseWriter, r *http.Request) {
 	}
 	t.Execute(w, AccountTemplateResult{
 		TemplateResult: TemplateResult{
-			Auth: getName(SESSIONS.Get(r)),
+			Auth:   getName(SESSIONS.Get(r)),
 			Result: result,
 			Return: retcod,
 		},
-		PublicKey: gp.PublicKeyToString(&user.Priv.PublicKey),
+		PublicKey:  gp.PublicKeyToString(&user.Priv.PublicKey),
 		PrivateKey: gp.PrivateKeyToString(user.Priv),
 	})
 }
@@ -275,7 +277,7 @@ func accountPrivateKeyPage(w http.ResponseWriter, r *http.Request) {
 func networkPage(w http.ResponseWriter, r *http.Request) {
 	type ReadTemplateResult struct {
 		TemplateResult
-		Page int
+		Page   int
 		Emails []us.Email
 	}
 	type Resp struct {
@@ -323,10 +325,10 @@ func networkPage(w http.ResponseWriter, r *http.Request) {
 	}
 	if r.Method == "POST" && r.FormValue("update") != "" {
 		var servresp Resp
-		conns  := DATABASE.GetConns(user)
+		conns := DATABASE.GetConns(user)
 		client := gp.NewClient(user.Priv, nil)
 		pbhash := gp.HashPublicKey(client.PublicKey())
-		rdata  := serialize(Req{
+		rdata := serialize(Req{
 			Recv: pbhash,
 			Data: "size",
 		})
@@ -338,27 +340,27 @@ func networkPage(w http.ResponseWriter, r *http.Request) {
 				bytes.NewReader(rdata),
 			)
 			if err != nil {
-				retcod, result = makeResult(RET_WARNING, 
-					result + fmt.Sprintf("send error: '%s'; ", addr))
+				retcod, result = makeResult(RET_WARNING,
+					result+fmt.Sprintf("send error: '%s'; ", addr))
 				continue
 			}
 			err = json.NewDecoder(resp.Body).Decode(&servresp)
 			resp.Body.Close()
 			if err != nil {
-				retcod, result = makeResult(RET_WARNING, 
-					result + fmt.Sprintf("parse json: '%s'; ", addr))
+				retcod, result = makeResult(RET_WARNING,
+					result+fmt.Sprintf("parse json: '%s'; ", addr))
 				continue
 			}
 			if servresp.Return != 0 {
-				retcod, result = makeResult(RET_WARNING, 
-					result + fmt.Sprintf("return (%d): '%s'; ", servresp.Return, addr))
+				retcod, result = makeResult(RET_WARNING,
+					result+fmt.Sprintf("return (%d): '%s'; ", servresp.Return, addr))
 				continue
 			}
 			// GET DATA EMAILS
 			size, err := strconv.Atoi(servresp.Result)
 			if err != nil {
-				retcod, result = makeResult(RET_WARNING, 
-					result + fmt.Sprintf("parse int: '%s'; ", addr))
+				retcod, result = makeResult(RET_WARNING,
+					result+fmt.Sprintf("parse int: '%s'; ", addr))
 				continue
 			}
 			for i := 1; i <= size; i++ {
@@ -372,7 +374,7 @@ func networkPage(w http.ResponseWriter, r *http.Request) {
 					bytes.NewReader(req),
 				)
 				if err != nil {
-					continue 
+					continue
 				}
 				err = json.NewDecoder(resp.Body).Decode(&servresp)
 				resp.Body.Close()
@@ -429,7 +431,7 @@ func networkWritePage(w http.ResponseWriter, r *http.Request) {
 		client := gp.NewClient(user.Priv, nil)
 		recv := gp.StringToPublicKey(r.FormValue("receiver"))
 		pack := gp.NewPackage(
-			user.Name + us.SEPARATOR + r.FormValue("title"), 
+			user.Name+us.SEPARATOR+r.FormValue("title"),
 			r.FormValue("message"),
 		)
 		switch {
@@ -449,19 +451,19 @@ func networkWritePage(w http.ResponseWriter, r *http.Request) {
 					bytes.NewReader(rdata),
 				)
 				if err != nil {
-					retcod, result = makeResult(RET_WARNING, 
+					retcod, result = makeResult(RET_WARNING,
 						fmt.Sprintf("send error: '%s'\n", addr))
 					continue
 				}
 				err = json.NewDecoder(resp.Body).Decode(&servresp)
 				resp.Body.Close()
 				if err != nil {
-					retcod, result = makeResult(RET_WARNING, 
+					retcod, result = makeResult(RET_WARNING,
 						fmt.Sprintf("parse json: '%s'\n", addr))
 					continue
 				}
 				if servresp.Return != 0 {
-					retcod, result = makeResult(RET_WARNING, 
+					retcod, result = makeResult(RET_WARNING,
 						fmt.Sprintf("return (%d): '%s'\n", servresp.Return, addr))
 					continue
 				}
@@ -514,6 +516,7 @@ func networkConnectPage(w http.ResponseWriter, r *http.Request) {
 		TemplateResult
 		Connects []string
 	}
+	retcod, result := makeResult(RET_SUCCESS, "")
 	t, err := template.ParseFiles(
 		PATH_VIEWS+"base.html",
 		PATH_VIEWS+"connect.html",
@@ -528,16 +531,24 @@ func networkConnectPage(w http.ResponseWriter, r *http.Request) {
 	}
 	if r.Method == "POST" {
 		host := r.FormValue("hostname")
-		if r.FormValue("append") != "" {
-			DATABASE.SetConn(user, host)
-		}
-		if r.FormValue("delete") != "" {
-			DATABASE.DelConn(user, host)
+		host = strings.TrimSpace(host)
+		switch {
+		case host == "":
+			retcod, result = makeResult(RET_DANGER, "string is null")
+		default:
+			if r.FormValue("append") != "" {
+				DATABASE.SetConn(user, host)
+			}
+			if r.FormValue("delete") != "" {
+				DATABASE.DelConn(user, host)
+			}
 		}
 	}
 	t.Execute(w, ConnTemplateResult{
 		TemplateResult: TemplateResult{
-			Auth: getName(SESSIONS.Get(r)),
+			Auth:   getName(SESSIONS.Get(r)),
+			Result: result,
+			Return: retcod,
 		},
 		Connects: DATABASE.GetConns(user),
 	})

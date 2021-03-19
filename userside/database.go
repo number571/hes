@@ -1,14 +1,14 @@
 package userside
 
 import (
+	"bytes"
+	"crypto/rsa"
 	"database/sql"
 	"fmt"
-	"time"
-	"bytes"
-	"strings"
-	"crypto/rsa"
 	_ "github.com/mattn/go-sqlite3"
 	gp "github.com/number571/gopeer"
+	"strings"
+	"time"
 )
 
 const (
@@ -142,7 +142,7 @@ func (db *DB) DelUser(user *User) error {
 
 func (db *DB) GetEmails(user *User, start, quan int) []Email {
 	var (
-		email *Email
+		email  *Email
 		emails []Email
 	)
 	for i := start; i < start+quan; i++ {
@@ -152,7 +152,7 @@ func (db *DB) GetEmails(user *User, start, quan int) []Email {
 		}
 		emails = append(emails, *email)
 	}
-	return emails 
+	return emails
 }
 
 func (db *DB) GetEmail(user *User, id int) *Email {

@@ -1,13 +1,19 @@
 package main
 
 import (
+	"bufio"
+	"bytes"
 	"encoding/json"
 	"flag"
-	"time"
 	"fmt"
 	gp "github.com/number571/gopeer"
+	"golang.org/x/net/proxy"
 	"net/http"
+	"net/url"
+	"os"
 	"strconv"
+	"strings"
+	"time"
 )
 
 const (
@@ -15,17 +21,29 @@ const (
 )
 
 var (
-	ADDRESS  string
-	DATABASE *DB
+	OPENADDR = ""
+	HPCLIENT = new(http.Client)
+	DATABASE = NewDB("server.db")
 )
 
 func init() {
+	torUsed := flag.Bool("tor", false, "enable socks5 and connect to tor network")
 	addrPtr := flag.String("open", "localhost:8080", "open address for hidden email server")
 	flag.Parse()
-	ADDRESS = *addrPtr
-	DATABASE = NewDB("server.db")
-	if DATABASE == nil {
-		panic("error: database init")
+	OPENADDR = *addrPtr
+	if *torUsed {
+		socks5, err := url.Parse("socks5://127.0.0.1:9050")
+		if err != nil {
+			panic("error: socks5 conn")
+		}
+		dialer, err := proxy.FromURL(socks5, proxy.Direct)
+		if err != nil {
+			panic("error: dialer")
+		}
+		HPCLIENT = &http.Client{
+			Transport: &http.Transport{Dial: dialer.Dial},
+			Timeout:   time.Second * 15,
+		}
 	}
 	fmt.Println("Server is listening...\n")
 }
@@ -37,10 +55,62 @@ func main() {
 			time.Sleep(6 * time.Hour)
 		}
 	}()
+	go func() {
+		var (
+			message string
+			splited []string
+		)
+		for {
+			message = inputString("> ")
+			splited = strings.Split(message, " ")
+			switch splited[0] {
+			case "exit":
+				os.Exit(0)
+			case "help":
+				fmt.Println(help())
+			case "list":
+				conns := DATABASE.GetConns()
+				for _, addr := range conns {
+					fmt.Printf("| %s\n", addr)
+				}
+				fmt.Println()
+			case "add":
+				if len(splited) < 2 {
+					fmt.Println("error: len.message < 2\n")
+					continue
+				}
+				DATABASE.SetConn(splited[1])
+			case "del":
+				if len(splited) < 2 {
+					fmt.Println("error: len.message < 2\n")
+					continue
+				}
+				DATABASE.DelConn(splited[1])
+			default:
+				fmt.Println("error: undefined command\n")
+			}
+		}
+	}()
 	http.HandleFunc("/", indexPage)
 	http.HandleFunc("/send", emailSendPage)
 	http.HandleFunc("/recv", emailRecvPage)
-	http.ListenAndServe(ADDRESS, nil)
+	http.ListenAndServe(OPENADDR, nil)
+}
+
+func help() string {
+	return `
+1. exit - close client;
+2. help - commands info;
+3. list - list connections;
+4. add  - append connect to list;
+5. del  - delete connect from list;
+`
+}
+
+func inputString(begin string) string {
+	fmt.Print(begin)
+	msg, _ := bufio.NewReader(os.Stdin).ReadString('\n')
+	return strings.Replace(msg, "\r\n", "", 1)
 }
 
 func indexPage(w http.ResponseWriter, r *http.Request) {
@@ -80,6 +150,18 @@ func emailSendPage(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		response(w, 6, "error: save email")
 		return
+	}
+	conns := DATABASE.GetConns()
+	for _, addr := range conns {
+		resp, err := HPCLIENT.Post(
+			"http://"+addr+"/send",
+			"application/json",
+			bytes.NewReader(serialize(req)),
+		)
+		if err != nil {
+			continue
+		}
+		resp.Body.Close()
 	}
 	response(w, 0, "success: email saved")
 }
@@ -132,4 +214,12 @@ func response(w http.ResponseWriter, ret int, res string) {
 	resp.Result = res
 	resp.Return = ret
 	json.NewEncoder(w).Encode(resp)
+}
+
+func serialize(data interface{}) []byte {
+	res, err := json.MarshalIndent(data, "", "\n")
+	if err != nil {
+		return nil
+	}
+	return res
 }

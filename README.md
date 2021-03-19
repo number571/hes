@@ -1,6 +1,6 @@
 # HES
 
-> Hidden email service. Version 1.1.1s.
+> Hidden email service. Version 1.1.2s.
 
 ### Characteristics:
 1. End to end encryption;
@@ -41,14 +41,20 @@ $ ./gclient -open="localhost:7545"
 
 #### Server side
 ```sql
+CREATE TABLE IF NOT EXISTS connects (
+	id      INTEGER,
+	host    VARCHAR(255) UNIQUE,
+	PRIMARY KEY(id)
+);
 /* recv = hash(public_key) */
 /* hash = hash(data) */
 /* data = encrypt(email) */
 CREATE TABLE IF NOT EXISTS emails (
-	id   INTEGER,
-	recv VARCHAR(255),
-	hash VARCHAR(255) UNIQUE,
-	data TEXT,
+	id      INTEGER,
+	recv    VARCHAR(255),
+	hash    VARCHAR(255) UNIQUE,
+	data    TEXT,
+	addtime DATETIME DEFAULT CURRENT_TIMESTAMP,
 	PRIMARY KEY(id)
 );
 ```
