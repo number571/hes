@@ -22,6 +22,7 @@ CREATE TABLE IF NOT EXISTS emails (
 	recv VARCHAR(255),
 	hash VARCHAR(255) UNIQUE,
 	data TEXT,
+	addtime DATETIME DEFAULT CURRENT_TIMESTAMP,
 	PRIMARY KEY(id)
 );
 `)
@@ -56,6 +57,16 @@ func (db *DB) GetEmail(id int, recv string) string {
 	)
 	row.Scan(&data)
 	return data
+}
+
+func (db *DB) DelEmailsByDay(day int) error {
+	db.mtx.Lock()
+	defer db.mtx.Unlock()
+	_, err := db.ptr.Exec(
+		"DELETE FROM emails WHERE addtime < datetime('now', '-' | $1 | ' days')",
+		day,
+	)
+	return err
 }
 
 func (db *DB) Size(recv string) int {

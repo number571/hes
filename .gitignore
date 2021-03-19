@@ -1,4 +1,6 @@
 server
 gclient
+gclient.exe
+server.exe
 server.db
 client.db

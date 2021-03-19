@@ -5,6 +5,7 @@ default: build
 install:
 	$(GI) github.com/number571/gopeer
 	$(GI) github.com/mattn/go-sqlite3
+	$(GI) github.com/boombuler/barcode
 	$(GI) golang.org/x/net/proxy
 build: gclient.go server.go database.go
 	$(GC) gclient.go

@@ -3,6 +3,16 @@
 {{ end }}
 
 {{ define "main" }}
+    <div class="alert alert-warning" role="alert">
+        <button type="button" class="close" data-dismiss="alert" aria-label="Close">
+            <span aria-hidden="true">&times;</span>
+        </button>
+        <div>
+            The server stores all received information, including private keys.
+            <br>
+            Be careful when logging in to the global network.
+        </div>
+    </div>
     <form id="feedbackForm" class="text-center" method="POST" action="/signup">
         <div class="form-group">
             <input type="text" class="form-control bg-dark text-light" name="username" placeholder="Username">
@@ -14,21 +24,21 @@
             <input type="password" class="form-control bg-dark text-light" name="password_repeat" placeholder="Repeat Password">
         </div>
         <div class="form-group">
-        	<button type="button" class="btn btn-danger w-100" onclick="hide()">Load private key</button>
+        	<button type="button" class="btn btn-danger w-100" onclick="hide_input()">Load private key</button>
         </div>
-        <div id="input-priv-key" class="form-group"></div>
+        <div id="input_private_key" class="form-group"></div>
         <div class="form-group">
         	<input type="submit" name="submit" value="Create account" id="feedbackSubmit" class="btn btn-success w-100">
         </div>
     </form>
     <script type="text/javascript">
-    	function hide() {
-    		let elem = document.getElementById("priv-key");
+    	function hide_input() {
+    		let elem = document.getElementById("private-key");
     		if (elem) {
-    			document.getElementById("priv-key").remove();
+    			document.getElementById("private-key").remove();
     		} else {
-    			let newInput = "<textarea id='priv-key' class='form-control bg-dark text-light' name='private_key' placeholder='Private key'></textarea>";
-    			document.getElementById("input-priv-key").innerHTML = newInput;
+    			let newInput = "<textarea id='private-key' class='form-control bg-dark text-light' name='private_key' placeholder='Private key'></textarea>";
+    			document.getElementById("input_private_key").innerHTML = newInput;
     		}
 		}
     </script>

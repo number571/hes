@@ -16,7 +16,6 @@ type User struct {
 	Id   int
 	Name string
 	Pasw []byte
-	Salt []byte
 	Priv *rsa.PrivateKey
 }
 
@@ -27,6 +26,7 @@ type Email struct {
 	Head       string
 	Body       string
 	Hash       string
+	Time       string
 }
 
 type Sessions struct {

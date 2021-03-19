@@ -3,6 +3,7 @@ package main
 import (
 	"encoding/json"
 	"flag"
+	"time"
 	"fmt"
 	gp "github.com/number571/gopeer"
 	"net/http"
@@ -30,6 +31,12 @@ func init() {
 }
 
 func main() {
+	go func() {
+		for {
+			DATABASE.DelEmailsByDay(1)
+			time.Sleep(6 * time.Hour)
+		}
+	}()
 	http.HandleFunc("/", indexPage)
 	http.HandleFunc("/send", emailSendPage)
 	http.HandleFunc("/recv", emailRecvPage)

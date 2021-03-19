@@ -1,6 +1,6 @@
 # HES
 
-> Hidden email service. Version 1.1.0s.
+> Hidden email service. Version 1.1.1s.
 
 ### Characteristics:
 1. End to end encryption;
@@ -17,6 +17,7 @@
 $ make install
 > go get github.com/number571/gopeer
 > go get github.com/mattn/go-sqlite3
+> go get github.com/boombuler/barcode
 > go get golang.org/x/net/proxy
 ```
 
@@ -55,7 +56,8 @@ CREATE TABLE IF NOT EXISTS emails (
 #### Client side
 ```sql
 /* !key_pasw = hash(password, salt)^20 */
-/* pasw      = hash(!key_pasw) */
+/* name      = hash(name) */
+/* pasw      = hash(!key_pasw, name) */
 /* priv      = encrypt[!key_pasw](private_key) */
 CREATE TABLE IF NOT EXISTS users (
 	id   INTEGER,
@@ -65,7 +67,7 @@ CREATE TABLE IF NOT EXISTS users (
 	priv TEXT,
 	PRIMARY KEY(id)
 );
-/* hash = hash(host, !key_pasw, salt) */
+/* hash = hash(host, !key_pasw) */
 /* host = encrypt[!key_pasw](host) */
 CREATE TABLE IF NOT EXISTS connects (
 	id      INTEGER,
@@ -75,19 +77,22 @@ CREATE TABLE IF NOT EXISTS connects (
 	PRIMARY KEY(id),
 	FOREIGN KEY(id_user) REFERENCES users(id) ON DELETE CASCADE
 );
-/* hash  = hash(pack_hash, !key_pasw, salt) */
-/* spubl = encrypt[!key_pasw](public_key) */
-/* sname = encrypt[!key_pasw](nickname) */
-/* head  = encrypt[!key_pasw](title) */
-/* body  = encrypt[!key_pasw](message) */
+/* hash    = hash(pack_hash, !key_pasw) */
+/* spubl   = encrypt[!key_pasw](public_key) */
+/* sname   = encrypt[!key_pasw](nickname) */
+/* head    = encrypt[!key_pasw](title) */
+/* body    = encrypt[!key_pasw](message) */
+/* addtime = encrypt[!key_pasw](time_rec) */
 CREATE TABLE IF NOT EXISTS emails (
 	id      INTEGER,
 	id_user INTEGER,
+	deleted BOOLEAN DEFAULT 0,
 	hash    VARCHAR(255) UNIQUE,
 	spubl   TEXT,
 	sname   VARCHAR(255),
 	head    VARCHAR(255),
 	body    TEXT,
+	addtime TEXT,
 	PRIMARY KEY(id),
 	FOREIGN KEY(id_user) REFERENCES users(id) ON DELETE CASCADE
 );

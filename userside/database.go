@@ -3,6 +3,7 @@ package userside
 import (
 	"database/sql"
 	"fmt"
+	"time"
 	"bytes"
 	"strings"
 	"crypto/rsa"
@@ -11,7 +12,7 @@ import (
 )
 
 const (
-	DIFF_ENTR   = 20 // bits
+	DIFF_ENTR = 20 // bits
 	SEPARATOR = "\005\007\001"
 )
 
@@ -21,6 +22,8 @@ func NewDB(name string) *DB {
 		return nil
 	}
 	_, err = db.Exec(`
+PRAGMA foreign_keys=ON;
+PRAGMA secure_delete=ON;
 CREATE TABLE IF NOT EXISTS users (
 	id   INTEGER,
 	name NVARCHAR(255) UNIQUE,
@@ -40,11 +43,13 @@ CREATE TABLE IF NOT EXISTS connects (
 CREATE TABLE IF NOT EXISTS emails (
 	id      INTEGER,
 	id_user INTEGER,
+	deleted BOOLEAN DEFAULT 0,
 	hash    VARCHAR(255) UNIQUE,
 	spubl   TEXT,
 	sname   VARCHAR(255),
 	head    VARCHAR(255),
 	body    TEXT,
+	addtime TEXT,
 	PRIMARY KEY(id),
 	FOREIGN KEY(id_user) REFERENCES users(id) ON DELETE CASCADE
 );
@@ -60,15 +65,22 @@ CREATE TABLE IF NOT EXISTS emails (
 func (db *DB) SetUser(name, pasw string, priv *rsa.PrivateKey) error {
 	db.mtx.Lock()
 	defer db.mtx.Unlock()
+	name = strings.TrimSpace(name)
 	if db.userExist(name) {
 		return fmt.Errorf("user already exist")
 	}
 	salt := gp.GenerateBytes(32)
 	bpasw := RaiseEntropy([]byte(pasw), salt, DIFF_ENTR)
-	hpasw := gp.HashSum(bpasw)
+	hpasw := gp.HashSum(bytes.Join(
+		[][]byte{
+			bpasw,
+			[]byte(name),
+		},
+		[]byte{},
+	))
 	_, err := db.ptr.Exec(
 		"INSERT INTO users (name, pasw, salt, priv) VALUES ($1, $2, $3, $4)",
-		name,
+		gp.Base64Encode(gp.HashSum([]byte(name))),
 		gp.Base64Encode(hpasw),
 		gp.Base64Encode(salt),
 		gp.Base64Encode(gp.EncryptAES(bpasw, gp.PrivateKeyToBytes(priv))),
@@ -80,14 +92,15 @@ func (db *DB) GetUser(name, pasw string) *User {
 	db.mtx.Lock()
 	defer db.mtx.Unlock()
 	var (
-		id   int
+		id    int
 		hpasw string
 		ssalt string
 		spriv string
 	)
+	name = strings.TrimSpace(name)
 	row := db.ptr.QueryRow(
 		"SELECT id, pasw, salt, priv FROM users WHERE name=$1",
-		name,
+		gp.Base64Encode(gp.HashSum([]byte(name))),
 	)
 	row.Scan(&id, &hpasw, &ssalt, &spriv)
 	if spriv == "" {
@@ -95,7 +108,14 @@ func (db *DB) GetUser(name, pasw string) *User {
 	}
 	salt := gp.Base64Decode(ssalt)
 	bpasw := RaiseEntropy([]byte(pasw), salt, DIFF_ENTR)
-	if !bytes.Equal(gp.HashSum(bpasw), gp.Base64Decode(hpasw)) {
+	chpasw := gp.HashSum(bytes.Join(
+		[][]byte{
+			bpasw,
+			[]byte(name),
+		},
+		[]byte{},
+	))
+	if !bytes.Equal(chpasw, gp.Base64Decode(hpasw)) {
 		return nil
 	}
 	priv := gp.BytesToPrivateKey(gp.DecryptAES(bpasw, gp.Base64Decode(spriv)))
@@ -106,9 +126,18 @@ func (db *DB) GetUser(name, pasw string) *User {
 		Id:   id,
 		Name: name,
 		Pasw: bpasw,
-		Salt: salt,
 		Priv: priv,
 	}
+}
+
+func (db *DB) DelUser(user *User) error {
+	db.mtx.Lock()
+	defer db.mtx.Unlock()
+	_, err := db.ptr.Exec(
+		"DELETE FROM users WHERE id=$1",
+		user.Id,
+	)
+	return err
 }
 
 func (db *DB) GetEmails(user *User, start, quan int) []Email {
@@ -135,13 +164,14 @@ func (db *DB) GetEmail(user *User, id int) *Email {
 		head  string
 		body  string
 		hash  string
+		atime string
 	)
 	row := db.ptr.QueryRow(
-		"SELECT spubl, sname, head, body, hash FROM emails WHERE id_user=$1 ORDER BY id DESC LIMIT 1 OFFSET $2",
+		"SELECT spubl, sname, head, body, hash, addtime FROM emails WHERE id_user=$1 AND deleted=0 ORDER BY id DESC LIMIT 1 OFFSET $2",
 		user.Id,
 		id,
 	)
-	row.Scan(&spubl, &sname, &head, &body, &hash)
+	row.Scan(&spubl, &sname, &head, &body, &hash, &atime)
 	if spubl == "" {
 		return nil
 	}
@@ -152,6 +182,7 @@ func (db *DB) GetEmail(user *User, id int) *Email {
 		SenderName: string(gp.DecryptAES(user.Pasw, gp.Base64Decode(sname))),
 		Head:       string(gp.DecryptAES(user.Pasw, gp.Base64Decode(head))),
 		Body:       string(gp.DecryptAES(user.Pasw, gp.Base64Decode(body))),
+		Time:       string(gp.DecryptAES(user.Pasw, gp.Base64Decode(atime))),
 	}
 }
 
@@ -166,13 +197,14 @@ func (db *DB) SetEmail(user *User, pack *gp.Package) error {
 		return fmt.Errorf("len.splited != 2")
 	}
 	_, err := db.ptr.Exec(
-		"INSERT INTO emails (id_user, hash, spubl, sname, head, body) VALUES ($1, $2, $3, $4, $5, $6)",
+		"INSERT INTO emails (id_user, hash, spubl, sname, head, body, addtime) VALUES ($1, $2, $3, $4, $5, $6, $7)",
 		user.Id,
 		hashWithSecret(user, pack.Body.Hash),
 		gp.Base64Encode(gp.EncryptAES(user.Pasw, []byte(pack.Head.Sender))),
 		gp.Base64Encode(gp.EncryptAES(user.Pasw, []byte(splited[0]))),
 		gp.Base64Encode(gp.EncryptAES(user.Pasw, []byte(splited[1]))),
 		gp.Base64Encode(gp.EncryptAES(user.Pasw, []byte(pack.Body.Data))),
+		gp.Base64Encode(gp.EncryptAES(user.Pasw, []byte(time.Now().Format(time.RFC850)))),
 	)
 	return err
 }
@@ -181,7 +213,7 @@ func (db *DB) DelEmail(user *User, hash string) error {
 	db.mtx.Lock()
 	defer db.mtx.Unlock()
 	_, err := db.ptr.Exec(
-		"DELETE FROM emails WHERE id_user=$1 AND hash=$2",
+		"UPDATE emails SET deleted=1, spubl=NULL, sname=NULL, head=NULL, body=NULL, addtime=NULL WHERE id_user=$1 AND hash=$2",
 		user.Id,
 		hash,
 	)
@@ -247,7 +279,7 @@ func (db *DB) userExist(name string) bool {
 	)
 	row := db.ptr.QueryRow(
 		"SELECT name FROM users WHERE name=$1",
-		name,
+		gp.Base64Encode(gp.HashSum([]byte(name))),
 	)
 	row.Scan(&namee)
 	return namee != ""
@@ -284,7 +316,6 @@ func hashWithSecret(user *User, data string) string {
 		[][]byte{
 			[]byte(data),
 			user.Pasw,
-			user.Salt,
 		},
 		[]byte{},
 	)))

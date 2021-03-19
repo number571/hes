@@ -6,9 +6,12 @@ import (
 	"encoding/json"
 	"flag"
 	"fmt"
+	"image/png"
 	"strconv"
 	gp "github.com/number571/gopeer"
 	"golang.org/x/net/proxy"
+	"github.com/boombuler/barcode"
+	"github.com/boombuler/barcode/qr"
 	"html/template"
 	"net/http"
 	"net/url"
@@ -186,6 +189,12 @@ func signoutPage(w http.ResponseWriter, r *http.Request) {
 }
 
 func accountPage(w http.ResponseWriter, r *http.Request) {
+	type AccountTemplateResult struct {
+		TemplateResult
+		PublicKey  string
+		PrivateKey string 
+	}
+	retcod, result := makeResult(RET_SUCCESS, "")
 	t, err := template.ParseFiles(
 		PATH_VIEWS+"base.html",
 		PATH_VIEWS+"account.html",
@@ -193,12 +202,33 @@ func accountPage(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		panic("error: load account.html")
 	}
-	if SESSIONS.Get(r) == nil {
+	user := SESSIONS.Get(r)
+	if user == nil {
 		http.Redirect(w, r, "/", 302)
 		return
 	}
-	t.Execute(w, TemplateResult{
-		Auth: getName(SESSIONS.Get(r)),
+	if r.Method == "POST" && r.FormValue("delete") != "" {
+		name := r.FormValue("username")
+		pasw := r.FormValue("password")
+		cuser := DATABASE.GetUser(name, pasw)
+		switch {
+		case cuser == nil || cuser.Id != user.Id:
+			retcod, result = makeResult(RET_DANGER, "username of password incorrect")
+		default:
+			SESSIONS.Del(w, r)
+			DATABASE.DelUser(cuser)
+			http.Redirect(w, r, "/", 302)
+			return
+		}
+	}
+	t.Execute(w, AccountTemplateResult{
+		TemplateResult: TemplateResult{
+			Auth: getName(SESSIONS.Get(r)),
+			Result: result,
+			Return: retcod,
+		},
+		PublicKey: gp.PublicKeyToString(&user.Priv.PublicKey),
+		PrivateKey: gp.PrivateKeyToString(user.Priv),
 	})
 }
 
@@ -208,7 +238,18 @@ func accountPublicKeyPage(w http.ResponseWriter, r *http.Request) {
 		fmt.Fprint(w, "session is nil")
 		return
 	}
-	fmt.Fprint(w, gp.PublicKeyToString(&user.Priv.PublicKey))
+	dataString := gp.PublicKeyToString(&user.Priv.PublicKey)
+	qrCode, err := qr.Encode(dataString, qr.Q, qr.Auto)
+	if err != nil {
+		fmt.Fprint(w, "qrcode generate error")
+		return
+	}
+	qrCode, err = barcode.Scale(qrCode, 768, 768)
+	if err != nil {
+		fmt.Fprint(w, "qrcode scale error")
+		return
+	}
+	png.Encode(w, qrCode)
 }
 
 func accountPrivateKeyPage(w http.ResponseWriter, r *http.Request) {
@@ -217,7 +258,18 @@ func accountPrivateKeyPage(w http.ResponseWriter, r *http.Request) {
 		fmt.Fprint(w, "session is nil")
 		return
 	}
-	fmt.Fprint(w, gp.PrivateKeyToString(user.Priv))
+	dataString := gp.PrivateKeyToString(user.Priv)
+	qrCode, err := qr.Encode(dataString, qr.Q, qr.Auto)
+	if err != nil {
+		fmt.Fprint(w, "qrcode generate error")
+		return
+	}
+	qrCode, err = barcode.Scale(qrCode, 768, 768)
+	if err != nil {
+		fmt.Fprint(w, "qrcode scale error")
+		return
+	}
+	png.Encode(w, qrCode)
 }
 
 func networkPage(w http.ResponseWriter, r *http.Request) {
