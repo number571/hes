@@ -27,8 +27,9 @@ type TemplateResult struct {
 }
 
 const (
-	MAXCOUNT = 10
-	MAXESIZE = 32 * (1 << 20) // 32MiB
+	MAXEPAGE = 5
+	MAXCOUNT = 5
+	MAXESIZE = (32 << 20) // 32MiB
 )
 
 const (
@@ -157,11 +158,12 @@ func signupPage(w http.ResponseWriter, r *http.Request) {
 			priv = gp.GenerateKey(gp.Get("AKEY_SIZE").(uint))
 		}
 		err := DATABASE.SetUser(name, pasw, priv)
-		if err == nil {
-			http.Redirect(w, r, "/signin", 302)
-			return
+		if err != nil {
+			retcod, result = makeResult(RET_DANGER, "username already exist")
+			goto close
 		}
-		retcod, result = makeResult(RET_DANGER, "username already exist")
+		http.Redirect(w, r, "/signin", 302)
+		return
 	}
 close:
 	t.Execute(w, TemplateResult{
@@ -297,9 +299,6 @@ func networkPage(w http.ResponseWriter, r *http.Request) {
 		Page   int
 		Emails []us.Email
 	}
-	const (
-		QUAN_EMAILS_PAGE = 5
-	)
 	page := 0
 	retcod, result := makeResult(RET_SUCCESS, "")
 	t, err := template.ParseFiles(
@@ -339,7 +338,7 @@ func networkPage(w http.ResponseWriter, r *http.Request) {
 		time.Sleep(3 * time.Second)
 	}
 close:
-	emails := DATABASE.GetEmails(user, page*QUAN_EMAILS_PAGE, QUAN_EMAILS_PAGE)
+	emails := DATABASE.GetEmails(user, page*MAXEPAGE, MAXEPAGE)
 	t.Execute(w, ReadTemplateResult{
 		TemplateResult: TemplateResult{
 			Auth:   getName(SESSIONS.Get(r)),
@@ -386,10 +385,10 @@ func networkWritePage(w http.ResponseWriter, r *http.Request) {
 			goto close
 		}
 		client := gp.NewClient(user.Priv, nil)
-		email := newEmail(user.Name, head, body)
-		rdata := serialize(Req{
+		pack   := newEmail(user.Name, head, body)
+		rdata  := serialize(Req{
 			Recv: gp.HashPublicKey(recv),
-			Data: gp.SerializePackage(client.Encrypt(recv, email)),
+			Data: gp.SerializePackage(client.Encrypt(recv, pack)),
 		})
 		conns := DATABASE.GetConns(user)
 		for _, addr := range conns {

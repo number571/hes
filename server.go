@@ -16,7 +16,7 @@ import (
 )
 
 const (
-	MAXESIZE = 32 * (1 << 20) // 32MiB
+	MAXESIZE = (32 << 20) // 32MiB
 )
 
 var (
