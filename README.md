@@ -21,8 +21,8 @@ $ make install
 > go get golang.org/x/net/proxy
 ```
 
-### Create email page:
-<img src="/userside/images/HES6.png" alt="CreateEmailPage"/>
+### Account page:
+<img src="/userside/images/HES4.png" alt="AccountPage"/>
 
 ### Compile and run:
 ```

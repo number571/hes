@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"crypto/rsa"
 	"database/sql"
+	"encoding/json"
 	"fmt"
 	_ "github.com/mattn/go-sqlite3"
 	gp "github.com/number571/gopeer"
@@ -13,7 +14,7 @@ import (
 
 const (
 	DIFF_ENTR = 20 // bits
-	SEPARATOR = "\005\007\001"
+	IS_EMAIL  = "IS-EMAIL"
 )
 
 func NewDB(name string) *DB {
@@ -70,7 +71,7 @@ func (db *DB) SetUser(name, pasw string, priv *rsa.PrivateKey) error {
 		return fmt.Errorf("user already exist")
 	}
 	salt := gp.GenerateBytes(32)
-	bpasw := RaiseEntropy([]byte(pasw), salt, DIFF_ENTR)
+	bpasw := gp.RaiseEntropy([]byte(pasw), salt, DIFF_ENTR)
 	hpasw := gp.HashSum(bytes.Join(
 		[][]byte{
 			bpasw,
@@ -107,7 +108,7 @@ func (db *DB) GetUser(name, pasw string) *User {
 		return nil
 	}
 	salt := gp.Base64Decode(ssalt)
-	bpasw := RaiseEntropy([]byte(pasw), salt, DIFF_ENTR)
+	bpasw := gp.RaiseEntropy([]byte(pasw), salt, DIFF_ENTR)
 	chpasw := gp.HashSum(bytes.Join(
 		[][]byte{
 			bpasw,
@@ -189,21 +190,34 @@ func (db *DB) GetEmail(user *User, id int) *Email {
 func (db *DB) SetEmail(user *User, pack *gp.Package) error {
 	db.mtx.Lock()
 	defer db.mtx.Unlock()
+	if pack.Head.Title != IS_EMAIL {
+		return fmt.Errorf("is not email")
+	}
 	if db.emailExist(user, pack.Body.Hash) {
 		return fmt.Errorf("email already exist")
 	}
-	splited := strings.Split(pack.Head.Title, SEPARATOR)
-	if len(splited) != 2 {
-		return fmt.Errorf("len.splited != 2")
+	var email Email
+	err := json.Unmarshal([]byte(pack.Body.Data), &email)
+	if err != nil {
+		return fmt.Errorf("json decode")
 	}
-	_, err := db.ptr.Exec(
+	name := strings.TrimSpace(email.SenderName)
+	if len(name) < 6 || len(name) > 64 {
+		return fmt.Errorf("len username < 6 or > 64")
+	}
+	head := strings.TrimSpace(email.Head)
+	body := strings.TrimSpace(email.Body)
+	if head == "" || body == "" {
+		return fmt.Errorf("head or body is null")
+	}
+	_, err = db.ptr.Exec(
 		"INSERT INTO emails (id_user, hash, spubl, sname, head, body, addtime) VALUES ($1, $2, $3, $4, $5, $6, $7)",
 		user.Id,
 		hashWithSecret(user, pack.Body.Hash),
 		gp.Base64Encode(gp.EncryptAES(user.Pasw, []byte(pack.Head.Sender))),
-		gp.Base64Encode(gp.EncryptAES(user.Pasw, []byte(splited[0]))),
-		gp.Base64Encode(gp.EncryptAES(user.Pasw, []byte(splited[1]))),
-		gp.Base64Encode(gp.EncryptAES(user.Pasw, []byte(pack.Body.Data))),
+		gp.Base64Encode(gp.EncryptAES(user.Pasw, []byte(name))),
+		gp.Base64Encode(gp.EncryptAES(user.Pasw, []byte(head))),
+		gp.Base64Encode(gp.EncryptAES(user.Pasw, []byte(body))),
 		gp.Base64Encode(gp.EncryptAES(user.Pasw, []byte(time.Now().Format(time.RFC850)))),
 	)
 	return err
@@ -250,6 +264,7 @@ func (db *DB) GetConns(user *User) []string {
 func (db *DB) SetConn(user *User, host string) error {
 	db.mtx.Lock()
 	defer db.mtx.Unlock()
+	host = strings.TrimSpace(host)
 	if db.connExist(user, host) {
 		return fmt.Errorf("conn already exist")
 	}
@@ -265,6 +280,7 @@ func (db *DB) SetConn(user *User, host string) error {
 func (db *DB) DelConn(user *User, host string) error {
 	db.mtx.Lock()
 	defer db.mtx.Unlock()
+	host = strings.TrimSpace(host)
 	_, err := db.ptr.Exec(
 		"DELETE FROM connects WHERE id_user=$1 AND hash=$2",
 		user.Id,
@@ -289,6 +305,7 @@ func (db *DB) connExist(user *User, host string) bool {
 	var (
 		hoste string
 	)
+	host = strings.TrimSpace(host)
 	row := db.ptr.QueryRow(
 		"SELECT host FROM connects WHERE id_user=$1 AND hash=$2",
 		user.Id,

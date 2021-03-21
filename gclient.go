@@ -27,6 +27,11 @@ type TemplateResult struct {
 }
 
 const (
+	MAXCOUNT = 10
+	MAXESIZE = 32 * (1 << 20) // 32MiB
+)
+
+const (
 	RET_SUCCESS = 0
 	RET_DANGER  = 1
 	RET_WARNING = 2
@@ -67,6 +72,12 @@ func init() {
 }
 
 func main() {
+	go func() {
+		for {
+			SESSIONS.DelByTime(1 * time.Hour)
+			time.Sleep(15 * time.Minute)
+		}
+	}()
 	http.Handle("/static/", http.StripPrefix(
 		"/static/",
 		handleFileServer(http.Dir(PATH_STATIC))),
@@ -122,31 +133,37 @@ func signupPage(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if r.Method == "POST" {
-		name := r.FormValue("username")
+		name := strings.TrimSpace(r.FormValue("username"))
 		pasw := r.FormValue("password")
 		spriv := r.FormValue("private_key")
 		priv := gp.StringToPrivateKey(spriv)
-		switch {
-		case len(name) < 6 || len(name) > 64:
+		if len(name) < 6 || len(name) > 64 {
 			retcod, result = makeResult(RET_DANGER, "need len username >= 6 and <= 64")
-		case len(pasw) < 8:
-			retcod, result = makeResult(RET_DANGER, "need len password >= 8")
-		case pasw != r.FormValue("password_repeat"):
-			retcod, result = makeResult(RET_DANGER, "passwords not equal")
-		case spriv != "" && priv == nil:
-			retcod, result = makeResult(RET_DANGER, "private key is not valid")
-		default:
-			if priv == nil {
-				priv = gp.GenerateKey(gp.Get("AKEY_SIZE").(uint))
-			}
-			err := DATABASE.SetUser(name, pasw, priv)
-			if err == nil {
-				http.Redirect(w, r, "/signin", 302)
-				return
-			}
-			retcod, result = makeResult(RET_DANGER, "username already exist")
+			goto close
 		}
+		if len(pasw) < 8 {
+			retcod, result = makeResult(RET_DANGER, "need len password >= 8")
+			goto close
+		}
+		if pasw != r.FormValue("password_repeat") {
+			retcod, result = makeResult(RET_DANGER, "passwords not equal")
+			goto close
+		}
+		if spriv != "" && priv == nil {
+			retcod, result = makeResult(RET_DANGER, "private key is not valid")
+			goto close
+		}
+		if priv == nil {
+			priv = gp.GenerateKey(gp.Get("AKEY_SIZE").(uint))
+		}
+		err := DATABASE.SetUser(name, pasw, priv)
+		if err == nil {
+			http.Redirect(w, r, "/signin", 302)
+			return
+		}
+		retcod, result = makeResult(RET_DANGER, "username already exist")
 	}
+close:
 	t.Execute(w, TemplateResult{
 		Result: result,
 		Return: retcod,
@@ -170,15 +187,15 @@ func signinPage(w http.ResponseWriter, r *http.Request) {
 		name := r.FormValue("username")
 		pasw := r.FormValue("password")
 		user := DATABASE.GetUser(name, pasw)
-		switch {
-		case user == nil:
+		if user == nil {
 			retcod, result = makeResult(RET_DANGER, "username of password incorrect")
-		default:
-			SESSIONS.Set(w, user)
-			http.Redirect(w, r, "/", 302)
-			return
+			goto close
 		}
+		SESSIONS.Set(w, user)
+		http.Redirect(w, r, "/", 302)
+		return
 	}
+close:
 	t.Execute(w, TemplateResult{
 		Result: result,
 		Return: retcod,
@@ -213,16 +230,16 @@ func accountPage(w http.ResponseWriter, r *http.Request) {
 		name := r.FormValue("username")
 		pasw := r.FormValue("password")
 		cuser := DATABASE.GetUser(name, pasw)
-		switch {
-		case cuser == nil || cuser.Id != user.Id:
+		if cuser == nil || cuser.Id != user.Id {
 			retcod, result = makeResult(RET_DANGER, "username of password incorrect")
-		default:
-			SESSIONS.Del(w, r)
-			DATABASE.DelUser(cuser)
-			http.Redirect(w, r, "/", 302)
-			return
+			goto close
 		}
+		SESSIONS.Del(w, r)
+		DATABASE.DelUser(cuser)
+		http.Redirect(w, r, "/", 302)
+		return
 	}
+close:
 	t.Execute(w, AccountTemplateResult{
 		TemplateResult: TemplateResult{
 			Auth:   getName(SESSIONS.Get(r)),
@@ -237,7 +254,7 @@ func accountPage(w http.ResponseWriter, r *http.Request) {
 func accountPublicKeyPage(w http.ResponseWriter, r *http.Request) {
 	user := SESSIONS.Get(r)
 	if user == nil {
-		fmt.Fprint(w, "session is nil")
+		fmt.Fprint(w, "session is null")
 		return
 	}
 	dataString := gp.PublicKeyToString(&user.Priv.PublicKey)
@@ -257,7 +274,7 @@ func accountPublicKeyPage(w http.ResponseWriter, r *http.Request) {
 func accountPrivateKeyPage(w http.ResponseWriter, r *http.Request) {
 	user := SESSIONS.Get(r)
 	if user == nil {
-		fmt.Fprint(w, "session is nil")
+		fmt.Fprint(w, "session is null")
 		return
 	}
 	dataString := gp.PrivateKeyToString(user.Priv)
@@ -280,14 +297,6 @@ func networkPage(w http.ResponseWriter, r *http.Request) {
 		Page   int
 		Emails []us.Email
 	}
-	type Resp struct {
-		Result string `json:"result"`
-		Return int    `json:"return"`
-	}
-	type Req struct {
-		Recv string `json:"recv"`
-		Data string `json:"data"`
-	}
 	const (
 		QUAN_EMAILS_PAGE = 5
 	)
@@ -307,16 +316,15 @@ func networkPage(w http.ResponseWriter, r *http.Request) {
 	}
 	if r.Method == "GET" && (r.FormValue("back") != "" || r.FormValue("next") != "") {
 		num, err := strconv.Atoi(r.FormValue("num"))
-		switch {
-		case err != nil:
+		if err != nil {
 			retcod, result = makeResult(RET_DANGER, "atoi parse error")
-		default:
-			if r.FormValue("back") != "" {
-				page = num - 1
-			}
-			if r.FormValue("next") != "" {
-				page = num + 1
-			}
+			goto close
+		}
+		if r.FormValue("back") != "" {
+			page = num - 1
+		}
+		if r.FormValue("next") != "" {
+			page = num + 1
 		}
 	}
 	if r.Method == "POST" && r.FormValue("delete") != "" {
@@ -324,75 +332,13 @@ func networkPage(w http.ResponseWriter, r *http.Request) {
 		DATABASE.DelEmail(user, hash)
 	}
 	if r.Method == "POST" && r.FormValue("update") != "" {
-		var servresp Resp
 		conns := DATABASE.GetConns(user)
-		client := gp.NewClient(user.Priv, nil)
-		pbhash := gp.HashPublicKey(client.PublicKey())
-		rdata := serialize(Req{
-			Recv: pbhash,
-			Data: "size",
-		})
 		for _, addr := range conns {
-			// GET SIZE EMAILS
-			resp, err := HPCLIENT.Post(
-				"http://"+addr+"/recv",
-				"application/json",
-				bytes.NewReader(rdata),
-			)
-			if err != nil {
-				retcod, result = makeResult(RET_WARNING,
-					result+fmt.Sprintf("send error: '%s'; ", addr))
-				continue
-			}
-			err = json.NewDecoder(resp.Body).Decode(&servresp)
-			resp.Body.Close()
-			if err != nil {
-				retcod, result = makeResult(RET_WARNING,
-					result+fmt.Sprintf("parse json: '%s'; ", addr))
-				continue
-			}
-			if servresp.Return != 0 {
-				retcod, result = makeResult(RET_WARNING,
-					result+fmt.Sprintf("return (%d): '%s'; ", servresp.Return, addr))
-				continue
-			}
-			// GET DATA EMAILS
-			size, err := strconv.Atoi(servresp.Result)
-			if err != nil {
-				retcod, result = makeResult(RET_WARNING,
-					result+fmt.Sprintf("parse int: '%s'; ", addr))
-				continue
-			}
-			for i := 1; i <= size; i++ {
-				req := serialize(Req{
-					Recv: pbhash,
-					Data: fmt.Sprintf("%d", i),
-				})
-				resp, err := HPCLIENT.Post(
-					"http://"+addr+"/recv",
-					"application/json",
-					bytes.NewReader(req),
-				)
-				if err != nil {
-					continue
-				}
-				err = json.NewDecoder(resp.Body).Decode(&servresp)
-				resp.Body.Close()
-				if err != nil {
-					continue
-				}
-				if servresp.Return != 0 {
-					continue
-				}
-				pack := gp.DeserializePackage(servresp.Result)
-				pack = client.Decrypt(pack)
-				if pack == nil {
-					continue
-				}
-				DATABASE.SetEmail(user, pack)
-			}
+			go readEmails(user, addr)
 		}
+		time.Sleep(3 * time.Second)
 	}
+close:
 	emails := DATABASE.GetEmails(user, page*QUAN_EMAILS_PAGE, QUAN_EMAILS_PAGE)
 	t.Execute(w, ReadTemplateResult{
 		TemplateResult: TemplateResult{
@@ -428,48 +374,29 @@ func networkWritePage(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if r.Method == "POST" {
-		client := gp.NewClient(user.Priv, nil)
 		recv := gp.StringToPublicKey(r.FormValue("receiver"))
-		pack := gp.NewPackage(
-			user.Name+us.SEPARATOR+r.FormValue("title"),
-			r.FormValue("message"),
-		)
-		switch {
-		case recv == nil:
-			retcod, result = makeResult(RET_DANGER, "receiver is nil")
-		default:
-			var servresp Resp
-			conns := DATABASE.GetConns(user)
-			rdata := serialize(Req{
-				Recv: gp.HashPublicKey(recv),
-				Data: gp.SerializePackage(client.Encrypt(recv, pack)),
-			})
-			for _, addr := range conns {
-				resp, err := HPCLIENT.Post(
-					"http://"+addr+"/send",
-					"application/json",
-					bytes.NewReader(rdata),
-				)
-				if err != nil {
-					retcod, result = makeResult(RET_WARNING,
-						fmt.Sprintf("send error: '%s'\n", addr))
-					continue
-				}
-				err = json.NewDecoder(resp.Body).Decode(&servresp)
-				resp.Body.Close()
-				if err != nil {
-					retcod, result = makeResult(RET_WARNING,
-						fmt.Sprintf("parse json: '%s'\n", addr))
-					continue
-				}
-				if servresp.Return != 0 {
-					retcod, result = makeResult(RET_WARNING,
-						fmt.Sprintf("return (%d): '%s'\n", servresp.Return, addr))
-					continue
-				}
-			}
+		if recv == nil {
+			retcod, result = makeResult(RET_DANGER, "receiver is null")
+			goto close
+		}
+		head := strings.TrimSpace(r.FormValue("title"))
+		body := strings.TrimSpace(r.FormValue("message"))
+		if head == "" || body == "" {
+			retcod, result = makeResult(RET_DANGER, "head or body is null")
+			goto close
+		}
+		client := gp.NewClient(user.Priv, nil)
+		email := newEmail(user.Name, head, body)
+		rdata := serialize(Req{
+			Recv: gp.HashPublicKey(recv),
+			Data: gp.SerializePackage(client.Encrypt(recv, email)),
+		})
+		conns := DATABASE.GetConns(user)
+		for _, addr := range conns {
+			go writeEmails(addr, rdata)
 		}
 	}
+close:
 	t.Execute(w, TemplateResult{
 		Auth:   getName(SESSIONS.Get(r)),
 		Result: result,
@@ -482,6 +409,7 @@ func networkReadPage(w http.ResponseWriter, r *http.Request) {
 		TemplateResult
 		Email *us.Email
 	}
+	retcod, result := makeResult(RET_SUCCESS, "")
 	t, err := template.ParseFiles(
 		PATH_VIEWS+"base.html",
 		PATH_VIEWS+"read.html",
@@ -496,16 +424,21 @@ func networkReadPage(w http.ResponseWriter, r *http.Request) {
 	}
 	var email *us.Email
 	id, err := strconv.Atoi(r.FormValue("email"))
-	if err == nil {
-		email = DATABASE.GetEmail(user, id)
+	if err != nil {
+		retcod, result = makeResult(RET_DANGER, "atoi parse error")
+		goto close
 	}
+	email = DATABASE.GetEmail(user, id)
 	if email == nil {
-		fmt.Fprint(w, "email undefined")
-		return
+		retcod, result = makeResult(RET_DANGER, "email undefined")
+		goto close
 	}
+close:
 	t.Execute(w, ReadTemplateResult{
 		TemplateResult: TemplateResult{
-			Auth: getName(SESSIONS.Get(r)),
+			Auth:   getName(SESSIONS.Get(r)),
+			Result: result,
+			Return: retcod,
 		},
 		Email: email,
 	})
@@ -530,20 +463,19 @@ func networkConnectPage(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if r.Method == "POST" {
-		host := r.FormValue("hostname")
-		host = strings.TrimSpace(host)
-		switch {
-		case host == "":
+		host := strings.TrimSpace(r.FormValue("hostname"))
+		if host == "" {
 			retcod, result = makeResult(RET_DANGER, "string is null")
-		default:
-			if r.FormValue("append") != "" {
-				DATABASE.SetConn(user, host)
-			}
-			if r.FormValue("delete") != "" {
-				DATABASE.DelConn(user, host)
-			}
+			goto close
+		}
+		if r.FormValue("append") != "" {
+			DATABASE.SetConn(user, host)
+		}
+		if r.FormValue("delete") != "" {
+			DATABASE.DelConn(user, host)
 		}
 	}
+close:
 	t.Execute(w, ConnTemplateResult{
 		TemplateResult: TemplateResult{
 			Auth:   getName(SESSIONS.Get(r)),
@@ -552,6 +484,123 @@ func networkConnectPage(w http.ResponseWriter, r *http.Request) {
 		},
 		Connects: DATABASE.GetConns(user),
 	})
+}
+
+func writeEmails(addr string, rdata []byte) {
+	type Resp struct {
+		Result string `json:"result"`
+		Return int    `json:"return"`
+	}
+	type Req struct {
+		Recv string `json:"recv"`
+		Data int    `json:"data"`
+	}
+	var servresp Resp
+	resp, err := HPCLIENT.Post(
+		"http://"+addr+"/send",
+		"application/json",
+		bytes.NewReader(rdata),
+	)
+	if err != nil {
+		return
+	}
+	if resp.ContentLength > MAXESIZE {
+		return
+	}
+	err = json.NewDecoder(resp.Body).Decode(&servresp)
+	resp.Body.Close()
+	if err != nil {
+		return
+	}
+	if servresp.Return != 0 {
+		return
+	}
+}
+
+func readEmails(user *us.User, addr string) {
+	type Resp struct {
+		Result string `json:"result"`
+		Return int    `json:"return"`
+	}
+	type Req struct {
+		Recv string `json:"recv"`
+		Data int    `json:"data"`
+	}
+	var servresp Resp
+	client := gp.NewClient(user.Priv, nil)
+	pbhash := gp.HashPublicKey(client.PublicKey())
+	// GET SIZE EMAILS
+	resp, err := HPCLIENT.Post(
+		"http://"+addr+"/recv",
+		"application/json",
+		bytes.NewReader(serialize(Req{
+			Recv: pbhash,
+			Data: 0,
+		})),
+	)
+	if err != nil {
+		return
+	}
+	if resp.ContentLength > MAXESIZE {
+		return
+	}
+	err = json.NewDecoder(resp.Body).Decode(&servresp)
+	resp.Body.Close()
+	if err != nil {
+		return
+	}
+	if servresp.Return != 0 {
+		return
+	}
+	// GET DATA EMAILS
+	size, err := strconv.Atoi(servresp.Result)
+	if err != nil {
+		return
+	}
+	for i, count := 1, 0; i <= size; i++ {
+		resp, err := HPCLIENT.Post(
+			"http://"+addr+"/recv",
+			"application/json",
+			bytes.NewReader(serialize(Req{
+				Recv: pbhash,
+				Data: i,
+			})),
+		)
+		if err != nil {
+			break
+		}
+		if resp.ContentLength > MAXESIZE {
+			break
+		}
+		err = json.NewDecoder(resp.Body).Decode(&servresp)
+		resp.Body.Close()
+		if err != nil {
+			break
+		}
+		if servresp.Return != 0 {
+			continue
+		}
+		pack := gp.DeserializePackage(servresp.Result)
+		pack = client.Decrypt(pack)
+		if pack == nil {
+			continue
+		}
+		err = DATABASE.SetEmail(user, pack)
+		if err == nil {
+			count++
+		}
+		if count == MAXCOUNT {
+			break
+		}
+	}
+}
+
+func newEmail(sender, head, body string) *gp.Package {
+	return gp.NewPackage(us.IS_EMAIL, string(serialize(us.Email{
+		SenderName: sender,
+		Head:       head,
+		Body:       body,
+	})))
 }
 
 func getName(user *us.User) string {

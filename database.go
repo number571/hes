@@ -4,7 +4,9 @@ import (
 	"database/sql"
 	"fmt"
 	_ "github.com/mattn/go-sqlite3"
+	"strings"
 	"sync"
+	"time"
 )
 
 type DB struct {
@@ -18,6 +20,7 @@ func NewDB(filename string) *DB {
 		return nil
 	}
 	_, err = db.Exec(`
+PRAGMA secure_delete=ON;
 CREATE TABLE IF NOT EXISTS connects (
 	id      INTEGER,
 	host    VARCHAR(255) UNIQUE,
@@ -65,12 +68,12 @@ func (db *DB) GetEmail(id int, recv string) string {
 	return data
 }
 
-func (db *DB) DelEmailsByDay(day int) error {
+func (db *DB) DelEmailsByTime(t time.Duration) error {
 	db.mtx.Lock()
 	defer db.mtx.Unlock()
 	_, err := db.ptr.Exec(
-		"DELETE FROM emails WHERE addtime < datetime('now', '-' | $1 | ' days')",
-		day,
+		"DELETE FROM emails WHERE addtime < datetime('now', '-' || $1 || ' seconds')",
+		uint64(t)/1000000000, // seconds
 	)
 	return err
 }
@@ -116,6 +119,7 @@ func (db *DB) GetConns() []string {
 func (db *DB) SetConn(host string) error {
 	db.mtx.Lock()
 	defer db.mtx.Unlock()
+	host = strings.TrimSpace(host)
 	if db.connExist(host) {
 		return fmt.Errorf("conn already exist")
 	}
@@ -129,6 +133,7 @@ func (db *DB) SetConn(host string) error {
 func (db *DB) DelConn(host string) error {
 	db.mtx.Lock()
 	defer db.mtx.Unlock()
+	host = strings.TrimSpace(host)
 	_, err := db.ptr.Exec(
 		"DELETE FROM connects WHERE host=$1",
 		host,

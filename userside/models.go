@@ -30,6 +30,6 @@ type Email struct {
 }
 
 type Sessions struct {
-	mpn map[string]*User
+	mpn map[string]*sessionData
 	mtx sync.Mutex
 }

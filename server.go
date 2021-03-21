@@ -11,13 +11,12 @@ import (
 	"net/http"
 	"net/url"
 	"os"
-	"strconv"
 	"strings"
 	"time"
 )
 
 const (
-	MAXSIZE = 32 * (1 << 20) // 32MiB
+	MAXESIZE = 32 * (1 << 20) // 32MiB
 )
 
 var (
@@ -51,7 +50,7 @@ func init() {
 func main() {
 	go func() {
 		for {
-			DATABASE.DelEmailsByDay(1)
+			DATABASE.DelEmailsByTime(24 * time.Hour)
 			time.Sleep(6 * time.Hour)
 		}
 	}()
@@ -126,7 +125,7 @@ func emailSendPage(w http.ResponseWriter, r *http.Request) {
 		response(w, 1, "error: method != POST")
 		return
 	}
-	if r.ContentLength > MAXSIZE {
+	if r.ContentLength > MAXESIZE {
 		response(w, 2, "error: max size")
 		return
 	}
@@ -169,13 +168,13 @@ func emailSendPage(w http.ResponseWriter, r *http.Request) {
 func emailRecvPage(w http.ResponseWriter, r *http.Request) {
 	var req struct {
 		Recv string `json:"recv"`
-		Data string `json:"data"`
+		Data int    `json:"data"`
 	}
 	if r.Method != "POST" {
 		response(w, 1, "error: method != POST")
 		return
 	}
-	if r.ContentLength > MAXSIZE {
+	if r.ContentLength > MAXESIZE {
 		response(w, 2, "error: max size")
 		return
 	}
@@ -184,25 +183,16 @@ func emailRecvPage(w http.ResponseWriter, r *http.Request) {
 		response(w, 3, "error: parse json")
 		return
 	}
-	switch req.Data {
-	case "size":
+	if req.Data == 0 {
 		response(w, 0, fmt.Sprintf("%d", DATABASE.Size(req.Recv)))
 		return
-	default:
-		num, err := strconv.Atoi(req.Data)
-		if err != nil {
-			response(w, 4, "error: parse int")
-			return
-		}
-		res := DATABASE.GetEmail(num, req.Recv)
-		if res == "" {
-			response(w, 5, "error: nothing data")
-			return
-		}
-		response(w, 0, res)
+	}
+	res := DATABASE.GetEmail(req.Data, req.Recv)
+	if res == "" {
+		response(w, 4, "error: nothing data")
 		return
 	}
-	response(w, 6, "error: mode undefined")
+	response(w, 0, res)
 }
 
 func response(w http.ResponseWriter, ret int, res string) {
