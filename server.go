@@ -73,13 +73,13 @@ func main() {
 					fmt.Printf("| %s\n", addr)
 				}
 				fmt.Println()
-			case "add":
+			case "append":
 				if len(splited) < 2 {
 					fmt.Println("error: len.message < 2\n")
 					continue
 				}
 				DATABASE.SetConn(splited[1])
-			case "del":
+			case "delete":
 				if len(splited) < 2 {
 					fmt.Println("error: len.message < 2\n")
 					continue
@@ -91,18 +91,18 @@ func main() {
 		}
 	}()
 	http.HandleFunc("/", indexPage)
-	http.HandleFunc("/send", emailSendPage)
-	http.HandleFunc("/recv", emailRecvPage)
+	http.HandleFunc("/email/send", emailSendPage)
+	http.HandleFunc("/email/recv", emailRecvPage)
 	http.ListenAndServe(OPENADDR, nil)
 }
 
 func help() string {
 	return `
-1. exit - close client;
-2. help - commands info;
-3. list - list connections;
-4. add  - append connect to list;
-5. del  - delete connect from list;
+1. exit   - close server;
+2. help   - commands info;
+3. list   - list connections;
+4. append - append connect to list;
+5. delete - delete connect from list;
 `
 }
 
@@ -113,7 +113,7 @@ func inputString(begin string) string {
 }
 
 func indexPage(w http.ResponseWriter, r *http.Request) {
-	response(w, 0, "(HES) Hidden email service. Gopeer based.")
+	response(w, 0, "Hidden service.")
 }
 
 func emailSendPage(w http.ResponseWriter, r *http.Request) {
@@ -153,7 +153,7 @@ func emailSendPage(w http.ResponseWriter, r *http.Request) {
 	conns := DATABASE.GetConns()
 	for _, addr := range conns {
 		resp, err := HPCLIENT.Post(
-			"http://"+addr+"/send",
+			"http://"+addr+"/email/send",
 			"application/json",
 			bytes.NewReader(serialize(req)),
 		)

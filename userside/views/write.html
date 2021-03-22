@@ -4,8 +4,13 @@
 
 {{ define "main" }}
 	<form class="text-center" method="POST" action="/network/write">
-		<div class="form-group">
-            <input type="text" class="form-control bg-dark text-light" name="receiver" placeholder="Receiver public key">
+        <div class="form-group">
+            <select name="receiver" class="form-control bg-dark text-light">
+                <option disabled>Receiver</option>
+                {{ range $key, $value := .Contacts }}
+                    <option value="{{ $value }}">{{ $key }}</option>
+                {{ end }}
+            </select>
         </div>
         <div class="form-group">
             <input type="text" class="form-control bg-dark text-light" name="title" placeholder="Title">

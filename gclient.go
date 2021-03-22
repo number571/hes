@@ -93,6 +93,7 @@ func main() {
 	http.HandleFunc("/network", networkPage)
 	http.HandleFunc("/network/read", networkReadPage)
 	http.HandleFunc("/network/write", networkWritePage)
+	http.HandleFunc("/network/contact", networkContactPage)
 	http.HandleFunc("/network/connect", networkConnectPage)
 	http.ListenAndServe(OPENADDR, nil)
 }
@@ -338,7 +339,6 @@ func networkPage(w http.ResponseWriter, r *http.Request) {
 		time.Sleep(3 * time.Second)
 	}
 close:
-	emails := DATABASE.GetEmails(user, page*MAXEPAGE, MAXEPAGE)
 	t.Execute(w, ReadTemplateResult{
 		TemplateResult: TemplateResult{
 			Auth:   getName(SESSIONS.Get(r)),
@@ -346,11 +346,15 @@ close:
 			Return: retcod,
 		},
 		Page:   page,
-		Emails: emails,
+		Emails: DATABASE.GetEmails(user, page*MAXEPAGE, MAXEPAGE),
 	})
 }
 
 func networkWritePage(w http.ResponseWriter, r *http.Request) {
+	type WriteTemplateResult struct {
+		TemplateResult
+		Contacts map[string]string
+	}
 	type Resp struct {
 		Result string `json:"result"`
 		Return int    `json:"return"`
@@ -365,7 +369,7 @@ func networkWritePage(w http.ResponseWriter, r *http.Request) {
 		PATH_VIEWS+"write.html",
 	)
 	if err != nil {
-		panic("error: load network.html")
+		panic("error: load write.html")
 	}
 	user := SESSIONS.Get(r)
 	if user == nil {
@@ -396,10 +400,13 @@ func networkWritePage(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 close:
-	t.Execute(w, TemplateResult{
-		Auth:   getName(SESSIONS.Get(r)),
-		Result: result,
-		Return: retcod,
+	t.Execute(w, WriteTemplateResult{
+		TemplateResult: TemplateResult{
+			Auth:   getName(SESSIONS.Get(r)),
+			Result: result,
+			Return: retcod,
+		},
+		Contacts: DATABASE.GetContacts(user),
 	})
 }
 
@@ -443,6 +450,60 @@ close:
 	})
 }
 
+func networkContactPage(w http.ResponseWriter, r *http.Request) {
+	type ContactTemplateResult struct {
+		TemplateResult
+		Contacts map[string]string
+	}
+	retcod, result := makeResult(RET_SUCCESS, "")
+	t, err := template.ParseFiles(
+		PATH_VIEWS+"base.html",
+		PATH_VIEWS+"contact.html",
+	)
+	if err != nil {
+		panic("error: load contact.html")
+	}
+	user := SESSIONS.Get(r)
+	if user == nil {
+		http.Redirect(w, r, "/", 302)
+		return
+	}
+	if r.Method == "POST" && r.FormValue("append") != "" {
+		name := strings.TrimSpace(r.FormValue("nickname"))
+		if name == "" {
+			retcod, result = makeResult(RET_DANGER, "nickname is null")
+			goto close
+		}
+		publ := gp.StringToPublicKey(r.FormValue("public_key"))
+		if publ == nil {
+			retcod, result = makeResult(RET_DANGER, "public key is null")
+			goto close
+		}
+		err := DATABASE.SetContact(user, name, publ)
+		if err != nil {
+			retcod, result = makeResult(RET_DANGER, "contact already exist")
+			goto close
+		}
+	}
+	if r.Method == "POST" && r.FormValue("delete") != "" {
+		publ := gp.StringToPublicKey(r.FormValue("public_key"))
+		if publ == nil {
+			retcod, result = makeResult(RET_DANGER, "public key is null")
+			goto close
+		}
+		DATABASE.DelContact(user, publ)
+	}
+close:
+	t.Execute(w, ContactTemplateResult{
+		TemplateResult: TemplateResult{
+			Auth:   getName(SESSIONS.Get(r)),
+			Result: result,
+			Return: retcod,
+		},
+		Contacts: DATABASE.GetContacts(user),
+	})
+}
+
 func networkConnectPage(w http.ResponseWriter, r *http.Request) {
 	type ConnTemplateResult struct {
 		TemplateResult
@@ -454,7 +515,7 @@ func networkConnectPage(w http.ResponseWriter, r *http.Request) {
 		PATH_VIEWS+"connect.html",
 	)
 	if err != nil {
-		panic("error: load network.html")
+		panic("error: load connect.html")
 	}
 	user := SESSIONS.Get(r)
 	if user == nil {
@@ -496,7 +557,7 @@ func writeEmails(addr string, rdata []byte) {
 	}
 	var servresp Resp
 	resp, err := HPCLIENT.Post(
-		"http://"+addr+"/send",
+		"http://"+addr+"/email/send",
 		"application/json",
 		bytes.NewReader(rdata),
 	)
@@ -530,7 +591,7 @@ func readEmails(user *us.User, addr string) {
 	pbhash := gp.HashPublicKey(client.PublicKey())
 	// GET SIZE EMAILS
 	resp, err := HPCLIENT.Post(
-		"http://"+addr+"/recv",
+		"http://"+addr+"/email/recv",
 		"application/json",
 		bytes.NewReader(serialize(Req{
 			Recv: pbhash,
@@ -558,7 +619,7 @@ func readEmails(user *us.User, addr string) {
 	}
 	for i, count := 1, 0; i <= size; i++ {
 		resp, err := HPCLIENT.Post(
-			"http://"+addr+"/recv",
+			"http://"+addr+"/email/recv",
 			"application/json",
 			bytes.NewReader(serialize(Req{
 				Recv: pbhash,

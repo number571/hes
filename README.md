@@ -1,6 +1,6 @@
 # HES
 
-> Hidden email service. Version 1.1.2s.
+> Hidden email service. Version 1.1.3s.
 
 ### Characteristics:
 1. End to end encryption;
@@ -62,8 +62,8 @@ CREATE TABLE IF NOT EXISTS emails (
 #### Client side
 ```sql
 /* !key_pasw = hash(password, salt)^20 */
-/* name      = hash(name) */
-/* pasw      = hash(!key_pasw, name) */
+/* name      = hash(nickname) */
+/* pasw      = hash(!key_pasw, nickname) */
 /* priv      = encrypt[!key_pasw](private_key) */
 CREATE TABLE IF NOT EXISTS users (
 	id   INTEGER,
@@ -72,6 +72,20 @@ CREATE TABLE IF NOT EXISTS users (
 	salt VARCHAR(255),
 	priv TEXT,
 	PRIMARY KEY(id)
+);
+/* hashn = hash(nickname, !key_pasw) */
+/* hashp = hash(public_key, !key_pasw) */
+/* name  = encrypt[!key_pasw](nickname) */
+/* publ  = encrypt[!key_pasw](public_key) */
+CREATE TABLE IF NOT EXISTS contacts (
+	id INTEGER,
+	id_user INTEGER,
+	hashn VARCHAR(255) UNIQUE,
+	hashp VARCHAR(255) UNIQUE,
+	name NVARCHAR(255),
+	publ TEXT,
+	PRIMARY KEY(id),
+	FOREIGN KEY(id_user) REFERENCES users(id) ON DELETE CASCADE
 );
 /* hash = hash(host, !key_pasw) */
 /* host = encrypt[!key_pasw](host) */

@@ -33,6 +33,16 @@ CREATE TABLE IF NOT EXISTS users (
 	priv TEXT,
 	PRIMARY KEY(id)
 );
+CREATE TABLE IF NOT EXISTS contacts (
+	id INTEGER,
+	id_user INTEGER,
+	hashn VARCHAR(255) UNIQUE,
+	hashp VARCHAR(255) UNIQUE,
+	name NVARCHAR(255),
+	publ TEXT,
+	PRIMARY KEY(id),
+	FOREIGN KEY(id_user) REFERENCES users(id) ON DELETE CASCADE
+);
 CREATE TABLE IF NOT EXISTS connects (
 	id      INTEGER,
 	id_user INTEGER,
@@ -70,7 +80,7 @@ func (db *DB) SetUser(name, pasw string, priv *rsa.PrivateKey) error {
 	if db.userExist(name) {
 		return fmt.Errorf("user already exist")
 	}
-	salt := gp.GenerateBytes(32)
+	salt  := gp.GenerateBytes(32)
 	bpasw := gp.RaiseEntropy([]byte(pasw), salt, DIFF_ENTR)
 	hpasw := gp.HashSum(bytes.Join(
 		[][]byte{
@@ -234,6 +244,68 @@ func (db *DB) DelEmail(user *User, hash string) error {
 	return err
 }
 
+func (db *DB) GetContacts(user *User) map[string]string {
+	db.mtx.Lock()
+	defer db.mtx.Unlock()
+	var (
+		name     string
+		spub     string
+		contacts = make(map[string]string)
+	)
+	rows, err := db.ptr.Query(
+		"SELECT name, publ FROM contacts WHERE id_user=$1",
+		user.Id,
+	)
+	if err != nil {
+		return nil
+	}
+	defer rows.Close()
+	for rows.Next() {
+		err = rows.Scan(
+			&name,
+			&spub,
+		)
+		if err != nil {
+			break
+		}
+		name = string(gp.DecryptAES(user.Pasw, gp.Base64Decode(name)))
+		spub = string(gp.DecryptAES(user.Pasw, gp.Base64Decode(spub)))
+		contacts[name] = spub
+	}
+	return contacts
+}
+
+func (db *DB) SetContact(user *User, name string, pub *rsa.PublicKey) error {
+	db.mtx.Lock()
+	defer db.mtx.Unlock()
+	name  = strings.TrimSpace(name)
+	spub := gp.PublicKeyToString(pub)
+	if db.contactExist(user, name, spub) {
+		return fmt.Errorf("contact already exist")
+	}
+	_, err := db.ptr.Exec(
+		"INSERT INTO contacts (id_user, hashn, hashp, name, publ) VALUES ($1, $2, $3, $4, $5)",
+		user.Id,
+		hashWithSecret(user, name),
+		hashWithSecret(user, spub),
+		gp.Base64Encode(gp.EncryptAES(user.Pasw, []byte(name))),
+		gp.Base64Encode(gp.EncryptAES(user.Pasw, []byte(spub))),
+	)
+	return err
+}
+
+func (db *DB) DelContact(user *User, pub *rsa.PublicKey) error {
+	db.mtx.Lock()
+	defer db.mtx.Unlock()
+	spub := gp.PublicKeyToString(pub)
+	_, err := db.ptr.Exec(
+		"DELETE FROM contacts WHERE id_user=$1 AND hashp=$2",
+		user.Id,
+		hashWithSecret(user, spub),
+	)
+	return err
+}
+
 func (db *DB) GetConns(user *User) []string {
 	db.mtx.Lock()
 	defer db.mtx.Unlock()
@@ -296,6 +368,20 @@ func (db *DB) userExist(name string) bool {
 	row := db.ptr.QueryRow(
 		"SELECT name FROM users WHERE name=$1",
 		gp.Base64Encode(gp.HashSum([]byte(name))),
+	)
+	row.Scan(&namee)
+	return namee != ""
+}
+
+func (db *DB) contactExist(user *User, name, spub string) bool {
+	var (
+		namee string
+	)
+	row := db.ptr.QueryRow(
+		"SELECT name FROM contacts WHERE id_user=$1 AND (hashn=$2 OR hashp=$3)",
+		user.Id,
+		hashWithSecret(user, name),
+		hashWithSecret(user, spub),
 	)
 	row.Scan(&namee)
 	return namee != ""

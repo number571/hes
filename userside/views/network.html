@@ -4,17 +4,22 @@
 
 {{ define "main" }}
 	<div class="form-group row">
-		<div class="col-md-4 w-25">
+		<div class="col-md-3 w-25">
+			<form class="text-center" method="GET" action="/network/contact">
+				<input type="submit" name="submit" value="Contact" class="btn btn-success w-100">
+			</form>
+		</div>
+		<div class="col-md-3 w-25">
 			<form class="text-center" method="GET" action="/network/write">
 				<input type="submit" name="submit" value="Write" class="btn btn-success w-100">
 			</form>
 		</div>
-		<div class="col-md-4 w-25">
+		<div class="col-md-3 w-25">
 			<form class="text-center" method="GET" action="/network/connect">
 				<input type="submit" name="submit" value="Connect" class="btn btn-success w-100">
 			</form>
 		</div>
-		<div class="col-md-4 w-50">
+		<div class="col-md-3 w-25">
 			<form class="text-center" method="POST" action="/network">
 				<input type="submit" name="update" value="Update" class="btn btn-success w-100">
 			</form>
