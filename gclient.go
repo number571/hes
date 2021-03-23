@@ -29,7 +29,7 @@ type TemplateResult struct {
 const (
 	MAXEPAGE = 5
 	MAXCOUNT = 5
-	MAXESIZE = (32 << 20) // 32MiB
+	MAXESIZE = (5 << 20) // 5MiB
 )
 
 const (
@@ -389,8 +389,8 @@ func networkWritePage(w http.ResponseWriter, r *http.Request) {
 			goto close
 		}
 		client := gp.NewClient(user.Priv, nil)
-		pack   := newEmail(user.Name, head, body)
-		rdata  := serialize(Req{
+		pack := newEmail(user.Name, head, body)
+		rdata := serialize(Req{
 			Recv: gp.HashPublicKey(recv),
 			Data: gp.SerializePackage(client.Encrypt(recv, pack)),
 		})
@@ -453,6 +453,7 @@ close:
 func networkContactPage(w http.ResponseWriter, r *http.Request) {
 	type ContactTemplateResult struct {
 		TemplateResult
+		F2F bool
 		Contacts map[string]string
 	}
 	retcod, result := makeResult(RET_SUCCESS, "")
@@ -467,6 +468,9 @@ func networkContactPage(w http.ResponseWriter, r *http.Request) {
 	if user == nil {
 		http.Redirect(w, r, "/", 302)
 		return
+	}
+	if r.Method == "POST" && r.FormValue("switchf2f") != "" {
+		DATABASE.SwitchF2F(user)
 	}
 	if r.Method == "POST" && r.FormValue("append") != "" {
 		name := strings.TrimSpace(r.FormValue("nickname"))
@@ -500,6 +504,7 @@ close:
 			Result: result,
 			Return: retcod,
 		},
+		F2F: DATABASE.StateF2F(user),
 		Contacts: DATABASE.GetContacts(user),
 	})
 }

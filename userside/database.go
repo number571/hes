@@ -27,6 +27,7 @@ PRAGMA foreign_keys=ON;
 PRAGMA secure_delete=ON;
 CREATE TABLE IF NOT EXISTS users (
 	id   INTEGER,
+	f2f  BOOLEAN,
 	name NVARCHAR(255) UNIQUE,
 	pasw VARCHAR(255),
 	salt VARCHAR(255),
@@ -34,12 +35,12 @@ CREATE TABLE IF NOT EXISTS users (
 	PRIMARY KEY(id)
 );
 CREATE TABLE IF NOT EXISTS contacts (
-	id INTEGER,
+	id      INTEGER,
 	id_user INTEGER,
-	hashn VARCHAR(255) UNIQUE,
-	hashp VARCHAR(255) UNIQUE,
-	name NVARCHAR(255),
-	publ TEXT,
+	hashn   VARCHAR(255) UNIQUE,
+	hashp   VARCHAR(255) UNIQUE,
+	name    NVARCHAR(255),
+	publ    TEXT,
 	PRIMARY KEY(id),
 	FOREIGN KEY(id_user) REFERENCES users(id) ON DELETE CASCADE
 );
@@ -73,6 +74,32 @@ CREATE TABLE IF NOT EXISTS emails (
 	}
 }
 
+func (db *DB) StateF2F(user *User) bool {
+	db.mtx.Lock()
+	defer db.mtx.Unlock()
+	var (
+		f2f bool
+	)
+	row := db.ptr.QueryRow(
+		"SELECT f2f FROM users WHERE name=$1",
+		gp.Base64Encode(gp.HashSum([]byte(user.Name))),
+	)
+	row.Scan(&f2f)
+	return f2f
+}
+
+func (db *DB) SwitchF2F(user *User) error {
+	f2f := !db.StateF2F(user)
+	db.mtx.Lock()
+	defer db.mtx.Unlock()
+	_, err := db.ptr.Exec(
+		"UPDATE users SET f2f=$1 WHERE name=$2",
+		f2f,
+		gp.Base64Encode(gp.HashSum([]byte(user.Name))),
+	)
+	return err
+}
+
 func (db *DB) SetUser(name, pasw string, priv *rsa.PrivateKey) error {
 	db.mtx.Lock()
 	defer db.mtx.Unlock()
@@ -80,7 +107,7 @@ func (db *DB) SetUser(name, pasw string, priv *rsa.PrivateKey) error {
 	if db.userExist(name) {
 		return fmt.Errorf("user already exist")
 	}
-	salt  := gp.GenerateBytes(32)
+	salt := gp.GenerateBytes(32)
 	bpasw := gp.RaiseEntropy([]byte(pasw), salt, DIFF_ENTR)
 	hpasw := gp.HashSum(bytes.Join(
 		[][]byte{
@@ -90,7 +117,7 @@ func (db *DB) SetUser(name, pasw string, priv *rsa.PrivateKey) error {
 		[]byte{},
 	))
 	_, err := db.ptr.Exec(
-		"INSERT INTO users (name, pasw, salt, priv) VALUES ($1, $2, $3, $4)",
+		"INSERT INTO users (name, pasw, salt, priv, f2f) VALUES ($1, $2, $3, $4, 0)",
 		gp.Base64Encode(gp.HashSum([]byte(name))),
 		gp.Base64Encode(hpasw),
 		gp.Base64Encode(salt),
@@ -198,6 +225,9 @@ func (db *DB) GetEmail(user *User, id int) *Email {
 }
 
 func (db *DB) SetEmail(user *User, pack *gp.Package) error {
+	if db.StateF2F(user) && !db.InContacts(user, pack.Head.Sender) {
+		return fmt.Errorf("sender not in contacts")
+	}
 	db.mtx.Lock()
 	defer db.mtx.Unlock()
 	if pack.Head.Title != IS_EMAIL {
@@ -275,10 +305,25 @@ func (db *DB) GetContacts(user *User) map[string]string {
 	return contacts
 }
 
+func (db *DB) InContacts(user *User, spub string) bool {
+	db.mtx.Lock()
+	defer db.mtx.Unlock()
+	var (
+		namee string
+	)
+	row := db.ptr.QueryRow(
+		"SELECT name FROM contacts WHERE id_user=$1 AND hashp=$2",
+		user.Id,
+		hashWithSecret(user, spub),
+	)
+	row.Scan(&namee)
+	return namee != ""
+}
+
 func (db *DB) SetContact(user *User, name string, pub *rsa.PublicKey) error {
 	db.mtx.Lock()
 	defer db.mtx.Unlock()
-	name  = strings.TrimSpace(name)
+	name = strings.TrimSpace(name)
 	spub := gp.PublicKeyToString(pub)
 	if db.contactExist(user, name, spub) {
 		return fmt.Errorf("contact already exist")

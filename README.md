@@ -1,6 +1,6 @@
 # HES
 
-> Hidden email service. Version 1.1.3s.
+> Hidden email service. Version 1.1.4s.
 
 ### Characteristics:
 1. End to end encryption;
@@ -78,12 +78,12 @@ CREATE TABLE IF NOT EXISTS users (
 /* name  = encrypt[!key_pasw](nickname) */
 /* publ  = encrypt[!key_pasw](public_key) */
 CREATE TABLE IF NOT EXISTS contacts (
-	id INTEGER,
+	id      INTEGER,
 	id_user INTEGER,
-	hashn VARCHAR(255) UNIQUE,
-	hashp VARCHAR(255) UNIQUE,
-	name NVARCHAR(255),
-	publ TEXT,
+	hashn   VARCHAR(255) UNIQUE,
+	hashp   VARCHAR(255) UNIQUE,
+	name    NVARCHAR(255),
+	publ    TEXT,
 	PRIMARY KEY(id),
 	FOREIGN KEY(id_user) REFERENCES users(id) ON DELETE CASCADE
 );
