@@ -67,6 +67,7 @@ CREATE TABLE IF NOT EXISTS emails (
 /* priv      = encrypt[!key_pasw](private_key) */
 CREATE TABLE IF NOT EXISTS users (
 	id   INTEGER,
+	f2f  BOOLEAN,
 	name NVARCHAR(255) UNIQUE,
 	pasw VARCHAR(255),
 	salt VARCHAR(255),
