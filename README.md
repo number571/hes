@@ -54,7 +54,7 @@ CREATE TABLE IF NOT EXISTS emails (
 );
 ```
 
-### Server side cfg (server.cfg)
+#### Server side cfg (server.cfg)
 ```go
 type CFG struct {
 	Pasw  string      `json:"pasw"`
