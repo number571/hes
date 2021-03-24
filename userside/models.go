@@ -12,6 +12,11 @@ type DB struct {
 	mtx sync.Mutex
 }
 
+type Sessions struct {
+	mpn map[string]*sessionData
+	mtx sync.Mutex
+}
+
 type User struct {
 	Id   int
 	Name string
@@ -27,9 +32,4 @@ type Email struct {
 	Body       string
 	Hash       string
 	Time       string
-}
-
-type Sessions struct {
-	mpn map[string]*sessionData
-	mtx sync.Mutex
 }

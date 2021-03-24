@@ -2,9 +2,7 @@ package main
 
 import (
 	"database/sql"
-	"fmt"
 	_ "github.com/mattn/go-sqlite3"
-	"strings"
 	"sync"
 	"time"
 )
@@ -21,11 +19,6 @@ func NewDB(filename string) *DB {
 	}
 	_, err = db.Exec(`
 PRAGMA secure_delete=ON;
-CREATE TABLE IF NOT EXISTS connects (
-	id      INTEGER,
-	host    VARCHAR(255) UNIQUE,
-	PRIMARY KEY(id)
-);
 CREATE TABLE IF NOT EXISTS emails (
 	id      INTEGER,
 	recv    VARCHAR(255),
@@ -88,67 +81,4 @@ func (db *DB) Size(recv string) int {
 	)
 	row.Scan(&data)
 	return data
-}
-
-func (db *DB) GetConns() []string {
-	db.mtx.Lock()
-	defer db.mtx.Unlock()
-	var (
-		conn     string
-		connects []string
-	)
-	rows, err := db.ptr.Query(
-		"SELECT host FROM connects",
-	)
-	if err != nil {
-		return nil
-	}
-	defer rows.Close()
-	for rows.Next() {
-		err = rows.Scan(
-			&conn,
-		)
-		if err != nil {
-			break
-		}
-		connects = append(connects, conn)
-	}
-	return connects
-}
-
-func (db *DB) SetConn(host string) error {
-	db.mtx.Lock()
-	defer db.mtx.Unlock()
-	host = strings.TrimSpace(host)
-	if db.connExist(host) {
-		return fmt.Errorf("conn already exist")
-	}
-	_, err := db.ptr.Exec(
-		"INSERT INTO connects (host) VALUES ($1)",
-		host,
-	)
-	return err
-}
-
-func (db *DB) DelConn(host string) error {
-	db.mtx.Lock()
-	defer db.mtx.Unlock()
-	host = strings.TrimSpace(host)
-	_, err := db.ptr.Exec(
-		"DELETE FROM connects WHERE host=$1",
-		host,
-	)
-	return err
-}
-
-func (db *DB) connExist(host string) bool {
-	var (
-		hoste string
-	)
-	row := db.ptr.QueryRow(
-		"SELECT host FROM connects WHERE host=$1",
-		host,
-	)
-	row.Scan(&hoste)
-	return hoste != ""
 }

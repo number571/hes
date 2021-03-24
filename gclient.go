@@ -45,7 +45,7 @@ const (
 
 var (
 	OPENADDR = ""
-	HPCLIENT = new(http.Client)
+	HTCLIENT = new(http.Client)
 	DATABASE = us.NewDB("client.db")
 	SESSIONS = us.NewSessions()
 )
@@ -64,7 +64,7 @@ func init() {
 		if err != nil {
 			panic("error: dialer")
 		}
-		HPCLIENT = &http.Client{
+		HTCLIENT = &http.Client{
 			Transport: &http.Transport{Dial: dialer.Dial},
 			Timeout:   time.Second * 15,
 		}
@@ -333,8 +333,8 @@ func networkPage(w http.ResponseWriter, r *http.Request) {
 	}
 	if r.Method == "POST" && r.FormValue("update") != "" {
 		conns := DATABASE.GetConns(user)
-		for _, addr := range conns {
-			go readEmails(user, addr)
+		for _, conn := range conns {
+			go readEmails(user, conn[0])
 		}
 		time.Sleep(3 * time.Second)
 	}
@@ -362,6 +362,7 @@ func networkWritePage(w http.ResponseWriter, r *http.Request) {
 	type Req struct {
 		Recv string `json:"recv"`
 		Data string `json:"data"`
+		Macp string `json:"macp"`
 	}
 	retcod, result := makeResult(RET_SUCCESS, "")
 	t, err := template.ParseFiles(
@@ -389,14 +390,17 @@ func networkWritePage(w http.ResponseWriter, r *http.Request) {
 			goto close
 		}
 		client := gp.NewClient(user.Priv, nil)
-		pack := newEmail(user.Name, head, body)
-		rdata := serialize(Req{
+		pack   := client.Encrypt(recv, newEmail(user.Name, head, body))
+		hash   := gp.Base64Decode(pack.Body.Hash)
+		conns  := DATABASE.GetConns(user)
+		req    := Req{
 			Recv: gp.HashPublicKey(recv),
-			Data: gp.SerializePackage(client.Encrypt(recv, pack)),
-		})
-		conns := DATABASE.GetConns(user)
-		for _, addr := range conns {
-			go writeEmails(addr, rdata)
+			Data: gp.SerializePackage(pack),
+		}
+		for _, conn := range conns {
+			pasw := gp.HashSum([]byte(conn[1]))
+			req.Macp = gp.Base64Encode(gp.EncryptAES(pasw, hash))
+			go writeEmails(conn[0], serialize(req))
 		}
 	}
 close:
@@ -512,7 +516,7 @@ close:
 func networkConnectPage(w http.ResponseWriter, r *http.Request) {
 	type ConnTemplateResult struct {
 		TemplateResult
-		Connects []string
+		Connects [][2]string
 	}
 	retcod, result := makeResult(RET_SUCCESS, "")
 	t, err := template.ParseFiles(
@@ -534,7 +538,8 @@ func networkConnectPage(w http.ResponseWriter, r *http.Request) {
 			goto close
 		}
 		if r.FormValue("append") != "" {
-			DATABASE.SetConn(user, host)
+			pasw := r.FormValue("password")
+			DATABASE.SetConn(user, host, pasw)
 		}
 		if r.FormValue("delete") != "" {
 			DATABASE.DelConn(user, host)
@@ -561,7 +566,7 @@ func writeEmails(addr string, rdata []byte) {
 		Data int    `json:"data"`
 	}
 	var servresp Resp
-	resp, err := HPCLIENT.Post(
+	resp, err := HTCLIENT.Post(
 		"http://"+addr+"/email/send",
 		"application/json",
 		bytes.NewReader(rdata),
@@ -595,7 +600,7 @@ func readEmails(user *us.User, addr string) {
 	client := gp.NewClient(user.Priv, nil)
 	pbhash := gp.HashPublicKey(client.PublicKey())
 	// GET SIZE EMAILS
-	resp, err := HPCLIENT.Post(
+	resp, err := HTCLIENT.Post(
 		"http://"+addr+"/email/recv",
 		"application/json",
 		bytes.NewReader(serialize(Req{
@@ -623,7 +628,7 @@ func readEmails(user *us.User, addr string) {
 		return
 	}
 	for i, count := 1, 0; i <= size; i++ {
-		resp, err := HPCLIENT.Post(
+		resp, err := HTCLIENT.Post(
 			"http://"+addr+"/email/recv",
 			"application/json",
 			bytes.NewReader(serialize(Req{
@@ -680,7 +685,7 @@ func makeResult(retcod int, result string) (int, string) {
 }
 
 func serialize(data interface{}) []byte {
-	res, err := json.MarshalIndent(data, "", "\n")
+	res, err := json.MarshalIndent(data, "", "\t")
 	if err != nil {
 		return nil
 	}

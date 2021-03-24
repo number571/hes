@@ -49,6 +49,7 @@ CREATE TABLE IF NOT EXISTS connects (
 	id_user INTEGER,
 	hash    VARCHAR(255) UNIQUE,
 	host    VARCHAR(255),
+	pasw    VARCHAR(255),
 	PRIMARY KEY(id),
 	FOREIGN KEY(id_user) REFERENCES users(id) ON DELETE CASCADE
 );
@@ -351,15 +352,16 @@ func (db *DB) DelContact(user *User, pub *rsa.PublicKey) error {
 	return err
 }
 
-func (db *DB) GetConns(user *User) []string {
+func (db *DB) GetConns(user *User) [][2]string {
 	db.mtx.Lock()
 	defer db.mtx.Unlock()
 	var (
 		conn     string
-		connects []string
+		pasw     string
+		connects [][2]string
 	)
 	rows, err := db.ptr.Query(
-		"SELECT host FROM connects WHERE id_user=$1",
+		"SELECT host, pasw FROM connects WHERE id_user=$1",
 		user.Id,
 	)
 	if err != nil {
@@ -369,16 +371,20 @@ func (db *DB) GetConns(user *User) []string {
 	for rows.Next() {
 		err = rows.Scan(
 			&conn,
+			&pasw,
 		)
 		if err != nil {
 			break
 		}
-		connects = append(connects, string(gp.DecryptAES(user.Pasw, gp.Base64Decode(conn))))
+		connects = append(connects, [2]string{
+			string(gp.DecryptAES(user.Pasw, gp.Base64Decode(conn))),
+			string(gp.DecryptAES(user.Pasw, gp.Base64Decode(pasw))),
+		})
 	}
 	return connects
 }
 
-func (db *DB) SetConn(user *User, host string) error {
+func (db *DB) SetConn(user *User, host, pasw string) error {
 	db.mtx.Lock()
 	defer db.mtx.Unlock()
 	host = strings.TrimSpace(host)
@@ -386,10 +392,11 @@ func (db *DB) SetConn(user *User, host string) error {
 		return fmt.Errorf("conn already exist")
 	}
 	_, err := db.ptr.Exec(
-		"INSERT INTO connects (id_user, hash, host) VALUES ($1, $2, $3)",
+		"INSERT INTO connects (id_user, hash, host, pasw) VALUES ($1, $2, $3, $4)",
 		user.Id,
 		hashWithSecret(user, host),
 		gp.Base64Encode(gp.EncryptAES(user.Pasw, []byte(host))),
+		gp.Base64Encode(gp.EncryptAES(user.Pasw, []byte(pasw))),
 	)
 	return err
 }

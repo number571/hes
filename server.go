@@ -1,8 +1,8 @@
 package main
 
 import (
-	"bufio"
 	"bytes"
+	"bufio"
 	"encoding/json"
 	"flag"
 	"fmt"
@@ -19,10 +19,11 @@ const (
 	MAXESIZE = (5 << 20) // 5MiB
 )
 
-var (
-	OPENADDR = ""
-	HPCLIENT = new(http.Client)
+var (	
+	HTCLIENT = new(http.Client)
+	FLCONFIG = NewCFG("server.cfg")
 	DATABASE = NewDB("server.db")
+	OPENADDR = ""
 )
 
 func init() {
@@ -39,7 +40,7 @@ func init() {
 		if err != nil {
 			panic("error: dialer")
 		}
-		HPCLIENT = &http.Client{
+		HTCLIENT = &http.Client{
 			Transport: &http.Transport{Dial: dialer.Dial},
 			Timeout:   time.Second * 15,
 		}
@@ -52,42 +53,6 @@ func main() {
 		for {
 			DATABASE.DelEmailsByTime(24 * time.Hour)
 			time.Sleep(6 * time.Hour)
-		}
-	}()
-	go func() {
-		var (
-			message string
-			splited []string
-		)
-		for {
-			message = inputString("> ")
-			splited = strings.Split(message, " ")
-			switch splited[0] {
-			case "exit":
-				os.Exit(0)
-			case "help":
-				fmt.Println(help())
-			case "list":
-				conns := DATABASE.GetConns()
-				for _, addr := range conns {
-					fmt.Printf("| %s\n", addr)
-				}
-				fmt.Println()
-			case "append":
-				if len(splited) < 2 {
-					fmt.Println("error: len.message < 2\n")
-					continue
-				}
-				DATABASE.SetConn(splited[1])
-			case "delete":
-				if len(splited) < 2 {
-					fmt.Println("error: len.message < 2\n")
-					continue
-				}
-				DATABASE.DelConn(splited[1])
-			default:
-				fmt.Println("error: undefined command\n")
-			}
 		}
 	}()
 	http.HandleFunc("/", indexPage)
@@ -120,6 +85,7 @@ func emailSendPage(w http.ResponseWriter, r *http.Request) {
 	var req struct {
 		Recv string `json:"recv"`
 		Data string `json:"data"`
+		Macp string `json:"macp"`
 	}
 	if r.Method != "POST" {
 		response(w, 1, "error: method != POST")
@@ -145,14 +111,22 @@ func emailSendPage(w http.ResponseWriter, r *http.Request) {
 		response(w, 5, "error: proof of work")
 		return
 	}
-	err = DATABASE.SetEmail(req.Recv, pack.Body.Hash, req.Data)
-	if err != nil {
-		response(w, 6, "error: save email")
+	pasw := gp.HashSum([]byte(FLCONFIG.Pasw))
+	dech := gp.DecryptAES(pasw, gp.Base64Decode(req.Macp))
+	if !bytes.Equal(hash, dech) {
+		response(w, 6, "error: message authentication code")
 		return
 	}
-	conns := DATABASE.GetConns()
-	for _, addr := range conns {
-		resp, err := HPCLIENT.Post(
+	err = DATABASE.SetEmail(req.Recv, pack.Body.Hash, req.Data)
+	if err != nil {
+		response(w, 7, "error: save email")
+		return
+	}
+	for _, conn := range FLCONFIG.Conns {
+		addr := conn[0]
+		pasw := gp.HashSum([]byte(conn[1]))
+		req.Macp = gp.Base64Encode(gp.EncryptAES(pasw, hash))
+		resp, err := HTCLIENT.Post(
 			"http://"+addr+"/email/send",
 			"application/json",
 			bytes.NewReader(serialize(req)),
@@ -207,7 +181,7 @@ func response(w http.ResponseWriter, ret int, res string) {
 }
 
 func serialize(data interface{}) []byte {
-	res, err := json.MarshalIndent(data, "", "\n")
+	res, err := json.MarshalIndent(data, "", "\t")
 	if err != nil {
 		return nil
 	}

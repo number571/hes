@@ -1,18 +1,18 @@
 # HES
 
-> Hidden email service. Version 1.1.4s.
+> Hidden email service. Version 1.1.5s.
 
-### Characteristics:
+### Characteristics
 1. End to end encryption;
 2. Supported tor connections;
 3. Symmetric algorithm: AES-CBC;
 4. Asymmetric algorithm: RSA-OAEP, RSA-PSS;
 5. Hash function: SHA256;
 
-### Home page:
+### Home page
 <img src="/userside/images/HES1.png" alt="HomePage"/>
 
-### Install:
+### Install
 ```
 $ make install
 > go get github.com/number571/gopeer
@@ -21,31 +21,26 @@ $ make install
 > go get golang.org/x/net/proxy
 ```
 
-### Account page:
+### Account page
 <img src="/userside/images/HES4.png" alt="AccountPage"/>
 
-### Compile and run:
+### Compile and run
 ```
 $ make
 > go build gclient.go
-> go build server.go database.go
+> go build server.go database.go config.go
 $ ./server -open="localhost:8080" &
 $ ./gclient -open="localhost:7545"
 ```
 
-### List of emails page:
+### List of emails page
 <img src="/userside/images/HES7.png" alt="ListOfEmailsPage"/>
 
-### SQL Tables (database.db):
-> Database files are creates when the application starts.
+### DB and CFG files
+> Database and config files are creates when the application starts.
 
-#### Server side
+#### Server side db (server.db)
 ```sql
-CREATE TABLE IF NOT EXISTS connects (
-	id      INTEGER,
-	host    VARCHAR(255) UNIQUE,
-	PRIMARY KEY(id)
-);
 /* recv = hash(public_key) */
 /* hash = hash(data) */
 /* data = encrypt(email) */
@@ -59,7 +54,15 @@ CREATE TABLE IF NOT EXISTS emails (
 );
 ```
 
-#### Client side
+### Server side cfg (server.cfg)
+```go
+type CFG struct {
+	Pasw  string      `json:"pasw"`
+	Conns [][2]string `json:"conns"`
+}
+```
+
+#### Client side db (client.db)
 ```sql
 /* !key_pasw = hash(password, salt)^20 */
 /* name      = hash(nickname) */
@@ -90,11 +93,13 @@ CREATE TABLE IF NOT EXISTS contacts (
 );
 /* hash = hash(host, !key_pasw) */
 /* host = encrypt[!key_pasw](host) */
+/* pasw = encrypt[!key_pasw](pasw) */
 CREATE TABLE IF NOT EXISTS connects (
 	id      INTEGER,
 	id_user INTEGER,
 	hash    VARCHAR(255) UNIQUE,
 	host    VARCHAR(255),
+	pasw    VARCHAR(255),
 	PRIMARY KEY(id),
 	FOREIGN KEY(id_user) REFERENCES users(id) ON DELETE CASCADE
 );
@@ -119,5 +124,5 @@ CREATE TABLE IF NOT EXISTS emails (
 );
 ```
 
-### Email page:
+### Email page
 <img src="/userside/images/HES8.png" alt="EmailPage"/>
