@@ -123,18 +123,20 @@ func emailSendPage(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	for _, conn := range FLCONFIG.Conns {
-		addr := conn[0]
-		pasw := gp.HashSum([]byte(conn[1]))
-		req.Macp = gp.Base64Encode(gp.EncryptAES(pasw, hash))
-		resp, err := HTCLIENT.Post(
-			"http://"+addr+"/email/send",
-			"application/json",
-			bytes.NewReader(serialize(req)),
-		)
-		if err != nil {
-			continue
-		}
-		resp.Body.Close()
+		go func() {
+			addr := conn[0]
+			pasw := gp.HashSum([]byte(conn[1]))
+			req.Macp = gp.Base64Encode(gp.EncryptAES(pasw, hash))
+			resp, err := HTCLIENT.Post(
+				"http://"+addr+"/email/send",
+				"application/json",
+				bytes.NewReader(serialize(req)),
+			)
+			if err != nil {
+				return
+			}
+			resp.Body.Close()
+		}()
 	}
 	response(w, 0, "success: email saved")
 }
