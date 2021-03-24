@@ -2,7 +2,6 @@ package main
 
 import (
 	"bytes"
-	"bufio"
 	"encoding/json"
 	"flag"
 	"fmt"
@@ -10,8 +9,6 @@ import (
 	"golang.org/x/net/proxy"
 	"net/http"
 	"net/url"
-	"os"
-	"strings"
 	"time"
 )
 
@@ -69,12 +66,6 @@ func help() string {
 4. append - append connect to list;
 5. delete - delete connect from list;
 `
-}
-
-func inputString(begin string) string {
-	fmt.Print(begin)
-	msg, _ := bufio.NewReader(os.Stdin).ReadString('\n')
-	return strings.Replace(msg, "\r\n", "", 1)
 }
 
 func indexPage(w http.ResponseWriter, r *http.Request) {
