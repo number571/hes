@@ -389,7 +389,13 @@ func (db *DB) SetConn(user *User, host, pasw string) error {
 	defer db.mtx.Unlock()
 	host = strings.TrimSpace(host)
 	if db.connExist(user, host) {
-		return fmt.Errorf("conn already exist")
+		_, err := db.ptr.Exec(
+			"UPDATE connects SET pasw=$1 WHERE id_user=$2 AND hash=$3",
+			gp.Base64Encode(gp.EncryptAES(user.Pasw, []byte(pasw))),
+			user.Id,
+			hashWithSecret(user, host),
+		)
+		return err
 	}
 	_, err := db.ptr.Exec(
 		"INSERT INTO connects (id_user, hash, host, pasw) VALUES ($1, $2, $3, $4)",

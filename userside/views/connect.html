@@ -5,6 +5,11 @@
 {{ define "main" }}
 	<form class="text-center" method="POST" action="/network/connect">
 		<div class="form-group">
+			<input type="submit" name="check" value="Check connections" class="btn btn-success w-100">
+		</div>
+	</form>
+	<form class="text-center" method="POST" action="/network/connect">
+		<div class="form-group">
 			<input type="text" class="form-control bg-dark text-light" name="hostname" placeholder="Hostname">
 		</div>
 		<div class="form-group">

@@ -13,6 +13,7 @@ import (
 )
 
 const (
+	TMESSAGE = "\005\007\001\000\001\007\005"
 	MAXESIZE = (5 << 20) // 5MiB
 )
 
@@ -69,7 +70,29 @@ func help() string {
 }
 
 func indexPage(w http.ResponseWriter, r *http.Request) {
-	response(w, 0, "Hidden service.")
+	var req struct {
+		Macp string `json:"macp"`
+	}
+	if r.Method != "POST" {
+		response(w, 0, "hidden email service")
+		return
+	}
+	if r.ContentLength > MAXESIZE {
+		response(w, 1, "error: max size")
+		return
+	}
+	err := json.NewDecoder(r.Body).Decode(&req)
+	if err != nil {
+		response(w, 2, "error: parse json")
+		return
+	}
+	pasw := gp.HashSum([]byte(FLCONFIG.Pasw))
+	dect := gp.DecryptAES(pasw, gp.Base64Decode(req.Macp))
+	if !bytes.Equal([]byte(TMESSAGE), dect) {
+		response(w, 3, "error: message authentication code")
+		return
+	}
+	response(w, 0, "success: check connection")
 }
 
 func emailSendPage(w http.ResponseWriter, r *http.Request) {
