@@ -9,10 +9,10 @@
 	</div>
 	<div class="form-group row">
 		<div class="col-md-6 w-50">
-			<button type="button" class="btn btn-success w-100" onclick="copy_public_key()">CP public key</button>
+			<button type="button" class="btn btn-success w-100" onclick="copy_text('public_key')">CP public key</button>
 		</div>
 		<div class="col-md-6 w-50">
-			<button type="button" class="btn btn-success w-100" onclick="copy_private_key()">CP private key</button>
+			<button type="button" class="btn btn-success w-100" onclick="copy_text('private_key')">CP private key</button>
 		</div>
 	</div>
 	<div class="form-group row">
@@ -27,29 +27,47 @@
 			</form>
 		</div>
 	</div>
-	<div class="card text-white bg-dark mb-3">
-		<h5 class="card-header bg-secondary">Public key</h5>
-		<div class="card-body">
+	<div class="form-group row">
+		<div class="col-md-6 w-50">
+			<button type="button" class="btn btn-secondary w-100" onclick="view_block('view_public_key'); close_block('view_private_key')">VW public key</button>
+		</div>
+		<div class="col-md-6 w-50">
+			<button type="button" class="btn btn-secondary w-100" onclick="view_block('view_private_key'); close_block('view_public_key')">VW private key</button>
+		</div>
+	</div>
+	<div id="view_public_key" style="display: none" class="card text-white bg-dark mb-3">
+		<div class="card-header">
 			<h6 class="card-text">{{ .PublicKey }}</h6>
 		</div>
 	</div>
-	<div class="card text-white bg-dark mb-3">
-		<h5 class="card-header bg-secondary">Private key</h5>
-		<div class="card-body">
+	<div id="view_private_key" style="display: none" class="card text-white bg-dark mb-3">
+		<div class="card-header">
 			<h6 class="card-text">{{ .PrivateKey }}</h6>
 		</div>
 	</div>
 	<div class="form-group">
-			<button type="button" class="btn btn-danger w-100" onclick="hide_input()">Delete account</button>
+		<button type="button" class="btn btn-danger w-100" onclick="view_block('input_password')">Delete account</button>
 	</div>
-	<div id="input_password" class="form-group"></div>
+	<div id="input_password" style="display: none" class="form-group">
+		<form id='password-form' class="text-center" method="POST" action="/account">
+			<div class="form-group">
+				<input type='text' class='form-control bg-dark text-light' name='username' placeholder='Username'>
+			</div>
+			<div class="form-group">
+				<input type='password' class='form-control bg-dark text-light' name='password' placeholder='Password'>
+			</div>
+			<div class="form-group">
+				<input type="submit" name="delete" value="Confirm deletion " class="btn btn-warning w-100">
+			</div>
+		</form>
+	</div>
 	<div style="opacity:0">
 		<input id="private_key" type="text" value="{{ .PrivateKey }}">
 		<input id="public_key" type="text" value="{{ .PublicKey }}">
 	</div>
 	<script type="text/javascript">
-		function copy_public_key() {
-			var copyText = document.getElementById("public_key");
+		function copy_text(id) {
+			var copyText = document.getElementById(id);
 			copyText.select();
 			document.execCommand("copy");
 			let newInput = `
@@ -57,45 +75,21 @@
 				<button type="button" class="close" data-dismiss="alert" aria-label="Close">
 					<span aria-hidden="true">&times;</span>
 				</button>
-				Public key copied
+				Key copied
 			</div>
 			`
 			document.getElementById("message_copy").innerHTML = newInput;
-		} 
-		function copy_private_key() {
-			var copyText = document.getElementById("private_key");
-			copyText.select();
-			document.execCommand("copy");
-			let newInput = `
-			<div class="alert alert-success" role="alert">
-				<button type="button" class="close" data-dismiss="alert" aria-label="Close">
-					<span aria-hidden="true">&times;</span>
-				</button>
-				Private key copied
-			</div>
-			`
-			document.getElementById("message_copy").innerHTML = newInput;
-		} 
-		function hide_input() {
-			let elem = document.getElementById("password-form");
-			if (elem) {
-				document.getElementById("password-form").remove();
-			} else {
-				let newInput = `
-				<form id='password-form' class="text-center" method="POST" action="/account">
-					<div class="form-group">
-						<input type='text' class='form-control bg-dark text-light' name='username' placeholder='Username'>
-					</div>
-					<div class="form-group">
-						<input type='password' class='form-control bg-dark text-light' name='password' placeholder='Password'>
-					</div>
-					<div class="form-group">
-						<input type="submit" name="delete" value="Confirm deletion " class="btn btn-warning w-100">
-					</div>
-				</form>
-				`;
-				document.getElementById("input_password").innerHTML = newInput;
-			}
+		}
+		function view_block(id) {
+			var e = document.getElementById(id);
+			if(e.style.display == 'block')
+				e.style.display = 'none';
+			else
+				e.style.display = 'block';
+		}
+		function close_block(id) {
+			var e = document.getElementById(id);
+			e.style.display = 'none';
 		}
 	</script>
 {{ end }}
