@@ -52,12 +52,12 @@ var (
 )
 
 func init() {
-	torUsed := flag.Bool("tor", false, "enable socks5 and connect to tor network")
+	socks5Ptr := flag.String("socks5", "", "enable socks5 and create proxy connection")
 	addrPtr := flag.String("open", "localhost:7545", "open address for gui application")
 	flag.Parse()
 	OPENADDR = *addrPtr
-	if *torUsed {
-		socks5, err := url.Parse("socks5://127.0.0.1:9050")
+	if *socks5Ptr != "" {
+		socks5, err := url.Parse("socks5://" + *socks5Ptr)
 		if err != nil {
 			panic("error: socks5 conn")
 		}
