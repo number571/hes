@@ -1,6 +1,9 @@
 # HES
 
-> Hidden email service. Version 1.1.5s.
+> Hidden email service. Version 1.1.6s.
+
+### Home page
+<img src="/userside/images/HES1.png" alt="HomePage"/>
 
 ### Characteristics
 1. End to end encryption;
@@ -8,18 +11,6 @@
 3. Symmetric algorithm: AES-CBC;
 4. Asymmetric algorithm: RSA-OAEP, RSA-PSS;
 5. Hash function: SHA256;
-
-### Home page
-<img src="/userside/images/HES1.png" alt="HomePage"/>
-
-### Install
-```
-$ make install
-> go get github.com/number571/gopeer
-> go get github.com/mattn/go-sqlite3
-> go get github.com/boombuler/barcode
-> go get golang.org/x/net/proxy
-```
 
 ### Account page
 <img src="/userside/images/HES4.png" alt="AccountPage"/>

@@ -1,7 +1,7 @@
 package main
 
 import (
-	us "./userside"
+	us "github.com/number571/hes/userside"
 	"bytes"
 	"encoding/json"
 	"flag"
