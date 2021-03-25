@@ -1,5 +1,5 @@
 {{ define "title" }}
-	Signup
+    Signup
 {{ end }}
 
 {{ define "main" }}
@@ -24,22 +24,13 @@
             <input type="password" class="form-control bg-dark text-light" name="password_repeat" placeholder="Repeat Password">
         </div>
         <div class="form-group">
-        	<button type="button" class="btn btn-danger w-100" onclick="hide_input()">Load private key</button>
+            <button type="button" class="btn btn-danger w-100" onclick="view_block('input_private_key'); clear_value('private_key')">Load private key</button>
         </div>
-        <div id="input_private_key" class="form-group"></div>
+        <div id="input_private_key" style="display: none" class="form-group">
+            <input type="password" id="private_key" class="form-control bg-dark text-light" name="private_key" placeholder="Private key">
+        </div>
         <div class="form-group">
-        	<input type="submit" name="submit" value="Create account" id="feedbackSubmit" class="btn btn-success w-100">
+            <input type="submit" name="submit" value="Create account" id="feedbackSubmit" class="btn btn-success w-100">
         </div>
     </form>
-    <script type="text/javascript">
-    	function hide_input() {
-    		let elem = document.getElementById("private-key");
-    		if (elem) {
-    			document.getElementById("private-key").remove();
-    		} else {
-    			let newInput = "<textarea id='private-key' class='form-control bg-dark text-light' name='private_key' placeholder='Private key'></textarea>";
-    			document.getElementById("input_private_key").innerHTML = newInput;
-    		}
-		}
-    </script>
 {{ end }}

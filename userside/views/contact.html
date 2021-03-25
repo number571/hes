@@ -3,7 +3,14 @@
 {{ end }}
 
 {{ define "main" }}
-	<div id="message_copy" class="text-light mx-auto"></div>
+	<div id="message_copy" style="display: none" class="text-light mx-auto">
+		<div class="alert alert-success" role="alert">
+			<button type="button" class="close" onclick="close_block('message_copy')">
+				<span>&times;</span>
+			</button>
+			Key copied
+		</div>
+	</div>
 	<form class="text-center" method="POST" action="/network/contact">
         <div class="form-group">
         	{{ if .F2F }}
@@ -30,7 +37,7 @@
 				<button type="button" class="btn btn-secondary divtext w-100" disabled>{{ $key }}</button>
 			</div>
 			<div class="col-md-3 w-25">
-				<button type="button" class="btn btn-success w-100" onclick="copy_public_key('{{ $key }}')">Copy</button>
+				<button type="button" class="btn btn-success w-100" onclick="copy_text('public_key_' + '{{ $key }}')">Copy</button>
 			</div>
 			<div class="col-md-3 w-25">
 				<form class="text-center" method="POST" action="/network/contact">
@@ -45,20 +52,4 @@
 			<input id="public_key_{{ $key }}" type="text" value="{{ $value }}">
 		</div>
 	{{ end }}
-	<script type="text/javascript">
-		function copy_public_key(key) {
-			var copyText = document.getElementById("public_key_" + key);
-			copyText.select();
-			document.execCommand("copy");
-			let newInput = `
-			<div class="alert alert-success" role="alert">
-				<button type="button" class="close" data-dismiss="alert" aria-label="Close">
-					<span aria-hidden="true">&times;</span>
-				</button>
-				Public key copied
-			</div>
-			`
-			document.getElementById("message_copy").innerHTML = newInput;
-		}
-	</script>
 {{ end }}
