@@ -1,4 +1,4 @@
-package userside
+package main
 
 import (
 	"crypto/rsa"

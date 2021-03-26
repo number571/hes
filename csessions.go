@@ -1,4 +1,4 @@
-package userside
+package main
 
 import (
 	gp "github.com/number571/gopeer"

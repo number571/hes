@@ -1,9 +1,9 @@
-GI=go get
 GC=go build
+GFILES=client.go cdatabase.go cmodels.go csessions.go server.go sdatabase.go sconfig.go
 .PHONY: default build clean
 default: build
-build: gclient.go server.go database.go
-	$(GC) gclient.go
-	$(GC) server.go database.go config.go
+build: $(GFILES)
+	$(GC) client.go cdatabase.go cmodels.go csessions.go
+	$(GC) server.go sdatabase.go sconfig.go
 clean:
-	rm -f client.db server.db server.cfg server gclient
+	rm -f client.db server.db server.cfg server client

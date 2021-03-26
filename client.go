@@ -1,7 +1,6 @@
 package main
 
 import (
-	us "github.com/number571/hes/userside"
 	"bytes"
 	"encoding/json"
 	"flag"
@@ -47,8 +46,8 @@ const (
 var (
 	OPENADDR = ""
 	HTCLIENT = new(http.Client)
-	DATABASE = us.NewDB("client.db")
-	SESSIONS = us.NewSessions()
+	DATABASE = NewDB("client.db")
+	SESSIONS = NewSessions()
 )
 
 func init() {
@@ -299,7 +298,7 @@ func networkPage(w http.ResponseWriter, r *http.Request) {
 	type ReadTemplateResult struct {
 		TemplateResult
 		Page   int
-		Emails []us.Email
+		Emails []Email
 	}
 	page := 0
 	retcod, result := makeResult(RET_SUCCESS, "")
@@ -418,7 +417,7 @@ close:
 func networkReadPage(w http.ResponseWriter, r *http.Request) {
 	type ReadTemplateResult struct {
 		TemplateResult
-		Email *us.Email
+		Email *Email
 	}
 	retcod, result := makeResult(RET_SUCCESS, "")
 	t, err := template.ParseFiles(
@@ -433,7 +432,7 @@ func networkReadPage(w http.ResponseWriter, r *http.Request) {
 		http.Redirect(w, r, "/", 302)
 		return
 	}
-	var email *us.Email
+	var email *Email
 	id, err := strconv.Atoi(r.FormValue("email"))
 	if err != nil {
 		retcod, result = makeResult(RET_DANGER, "error: atoi parse")
@@ -644,7 +643,7 @@ func writeEmails(addr string, rdata []byte) {
 	}
 }
 
-func readEmails(user *us.User, addr string) {
+func readEmails(user *User, addr string) {
 	type Resp struct {
 		Result string `json:"result"`
 		Return int    `json:"return"`
@@ -723,14 +722,14 @@ func readEmails(user *us.User, addr string) {
 }
 
 func newEmail(sender, head, body string) *gp.Package {
-	return gp.NewPackage(us.IS_EMAIL, string(serialize(us.Email{
+	return gp.NewPackage(IS_EMAIL, string(serialize(Email{
 		SenderName: sender,
 		Head:       head,
 		Body:       body,
 	})))
 }
 
-func getName(user *us.User) string {
+func getName(user *User) string {
 	if user == nil {
 		return ""
 	}
