@@ -18,10 +18,10 @@
 ### Compile and run
 ```
 $ make
-> go build gclient.go
-> go build server.go database.go config.go
+> go build client.go cdatabase.go cmodels.go csessions.go
+> go build server.go sdatabase.go sconfig.go
 $ ./server -open="localhost:8080" &
-$ ./gclient -open="localhost:7545"
+$ ./client -open="localhost:7545"
 ```
 
 ### List of emails page
