@@ -420,13 +420,16 @@ func networkReadPage(w http.ResponseWriter, r *http.Request) {
 		Email *Email
 	}
 	retcod, result := makeResult(RET_SUCCESS, "")
-	t, err := template.ParseFiles(
+	t, err := template.New("base.html").Funcs(template.FuncMap{
+		"split": strings.Split,
+	}).ParseFiles(
 		PATH_VIEWS+"base.html",
 		PATH_VIEWS+"read.html",
 	)
 	if err != nil {
 		panic("error: load read.html")
 	}
+	t = template.Must(t, err)
 	user := SESSIONS.Get(r)
 	if user == nil {
 		http.Redirect(w, r, "/", 302)
