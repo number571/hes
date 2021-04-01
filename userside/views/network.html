@@ -28,14 +28,14 @@
 	<div class="form-group row">
 		<div class="col-md-6 w-50">
 			<form class="text-center" method="GET" action="/network">
-				<input type="hidden" name="num" value="{{ .Page }}">
-				<input {{ if (not .Page) }} disabled {{ end }} type="submit" name="back" value="Back" class="btn btn-info w-100">
+				<input type="hidden" name="num" value="{{ dec .Page }}">
+				<input {{ if (not .Page) }} disabled {{ end }} type="submit" name="page" value="Back" class="btn btn-info w-100">
 			</form>
 		</div>
 		<div class="col-md-6 w-50">
 			<form class="text-center" method="GET" action="/network">
-				<input type="hidden" name="num" value="{{ .Page }}">
-				<input {{ if (not .Emails) }} disabled {{ end }} type="submit" name="next" value="Next" class="btn btn-info w-100">
+				<input type="hidden" name="num" value="{{ inc .Page }}">
+				<input {{ if (not .Emails) }} disabled {{ end }} type="submit" name="page" value="Next" class="btn btn-info w-100">
 			</form>
 		</div>
 	</div>

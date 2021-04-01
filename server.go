@@ -15,12 +15,13 @@ import (
 const (
 	TMESSAGE = "\005\007\001\000\001\007\005"
 	MAXESIZE = (5 << 20) // 5MiB
+	POWSDIFF = 25
 )
 
 var (	
-	HTCLIENT = new(http.Client)
 	FLCONFIG = NewCFG("server.cfg")
 	DATABASE = NewDB("server.db")
+	HTCLIENT = new(http.Client)
 	OPENADDR = ""
 )
 
@@ -43,16 +44,25 @@ func init() {
 			Timeout:   time.Second * 15,
 		}
 	}
+	packageDifficulty(POWSDIFF)
+	go delEmailsByTime(24*time.Hour, 6*time.Hour)
 	fmt.Println("Server is listening...\n")
 }
 
+func packageDifficulty(bits int) {
+	gp.Set(gp.SettingsType{
+		"POWS_DIFF": uint(bits),
+	})
+}
+
+func delEmailsByTime(deltime, period time.Duration) {
+	for {
+		DATABASE.DelEmailsByTime(deltime)
+		time.Sleep(period)
+	}
+}
+
 func main() {
-	go func() {
-		for {
-			DATABASE.DelEmailsByTime(24 * time.Hour)
-			time.Sleep(6 * time.Hour)
-		}
-	}()
 	http.HandleFunc("/", indexPage)
 	http.HandleFunc("/email/send", emailSendPage)
 	http.HandleFunc("/email/recv", emailRecvPage)

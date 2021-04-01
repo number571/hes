@@ -27,9 +27,10 @@ type TemplateResult struct {
 
 const (
 	TMESSAGE = "\005\007\001\000\001\007\005"
+	MAXESIZE = (5 << 20) // 5MiB
+	POWSDIFF = 25
 	MAXEPAGE = 5
 	MAXCOUNT = 5
-	MAXESIZE = (5 << 20) // 5MiB
 )
 
 const (
@@ -69,16 +70,25 @@ func init() {
 			Timeout:   time.Second * 15,
 		}
 	}
+	packageDifficulty(POWSDIFF)
+	go delOldSessionsByTime(1*time.Hour, 15*time.Minute)
 	fmt.Println("Client is listening...\n")
 }
 
+func packageDifficulty(bits int) {
+	gp.Set(gp.SettingsType{
+		"POWS_DIFF": uint(bits),
+	})
+}
+
+func delOldSessionsByTime(deltime, period time.Duration) {
+	for {
+		SESSIONS.DelByTime(deltime)
+		time.Sleep(period)
+	}
+}
+
 func main() {
-	go func() {
-		for {
-			SESSIONS.DelByTime(1 * time.Hour)
-			time.Sleep(15 * time.Minute)
-		}
-	}()
 	http.Handle("/static/", http.StripPrefix(
 		"/static/",
 		handleFileServer(http.Dir(PATH_STATIC))),
@@ -302,30 +312,29 @@ func networkPage(w http.ResponseWriter, r *http.Request) {
 	}
 	page := 0
 	retcod, result := makeResult(RET_SUCCESS, "")
-	t, err := template.ParseFiles(
+	t, err := template.New("base.html").Funcs(template.FuncMap{
+		"inc": func(x int) int { return x + 1 },
+		"dec": func(x int) int { return x - 1 },
+	}).ParseFiles(
 		PATH_VIEWS+"base.html",
 		PATH_VIEWS+"network.html",
 	)
 	if err != nil {
 		panic("error: load network.html")
 	}
+	t = template.Must(t, err)
 	user := SESSIONS.Get(r)
 	if user == nil {
 		http.Redirect(w, r, "/", 302)
 		return
 	}
-	if r.Method == "GET" && (r.FormValue("back") != "" || r.FormValue("next") != "") {
+	if r.Method == "GET" && r.FormValue("page") != "" {
 		num, err := strconv.Atoi(r.FormValue("num"))
 		if err != nil {
 			retcod, result = makeResult(RET_DANGER, "error: parse atoi")
 			goto close
 		}
-		if r.FormValue("back") != "" {
-			page = num - 1
-		}
-		if r.FormValue("next") != "" {
-			page = num + 1
-		}
+		page = num
 	}
 	if r.Method == "POST" && r.FormValue("delete") != "" {
 		hash := r.FormValue("email")
