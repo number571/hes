@@ -42,19 +42,12 @@
 		</div>
 	</div>
 	{{ range .Emails }}
-		<div class="form-group row">
-			<div class="col-md-9 w-75">
-				<form class="text-center" method="GET" action="/network/read">
-					<input type="hidden" name="email" value="{{ .Id }}">
-					<input type="submit" name="read" value="{{ .SenderName }}:{{ .Head }}" class="btn btn-secondary w-100">
-				</form>
-			</div>
-			<div class="col-md-3 w-25">
-				<form class="text-center" method="POST" action="/network">
-					<input type="hidden" name="email" value="{{ .Hash }}">
-					<input type="submit" name="delete" value="Delete" class="btn btn-danger w-100">
-				</form>
-			</div>
+		{{ $texts := (texts .)}}
+		<div class="form-group">
+			<form class="text-center" method="GET" action="/network/read">
+				<input type="hidden" name="email" value="{{ .Id }}">
+				<input type="submit" name="read" value="{{ .SenderName }} | {{ index $texts 0 }}" class="btn btn-secondary w-100">
+			</form>
 		</div>
 	{{ end }}
 {{ end }}

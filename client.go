@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"flag"
 	"fmt"
+	"io/ioutil"
 	"github.com/boombuler/barcode"
 	"github.com/boombuler/barcode/qr"
 	gp "github.com/number571/gopeer"
@@ -27,6 +28,7 @@ type TemplateResult struct {
 
 const (
 	TMESSAGE = "\005\007\001\000\001\007\005"
+	FSEPARAT = "\001\007\005\000\005\007\001"
 	MAXESIZE = (5 << 20) // 5MiB
 	POWSDIFF = 25
 	MAXEPAGE = 5
@@ -315,6 +317,7 @@ func networkPage(w http.ResponseWriter, r *http.Request) {
 	t, err := template.New("base.html").Funcs(template.FuncMap{
 		"inc": func(x int) int { return x + 1 },
 		"dec": func(x int) int { return x - 1 },
+		"texts": getTexts,
 	}).ParseFiles(
 		PATH_VIEWS+"base.html",
 		PATH_VIEWS+"network.html",
@@ -387,6 +390,11 @@ func networkWritePage(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if r.Method == "POST" {
+		err := r.ParseMultipartForm(MAXESIZE)
+		if err != nil {
+			retcod, result = makeResult(RET_DANGER, "error: max size")
+			goto close
+		}
 		recv := gp.StringToPublicKey(r.FormValue("receiver"))
 		if recv == nil {
 			retcod, result = makeResult(RET_DANGER, "error: receiver is null")
@@ -397,6 +405,22 @@ func networkWritePage(w http.ResponseWriter, r *http.Request) {
 		if head == "" || body == "" {
 			retcod, result = makeResult(RET_DANGER, "error: head or body is null")
 			goto close
+		}
+		files := r.MultipartForm.File["files"]
+		for i := range files {
+			file, err := files[i].Open()
+			if err != nil {
+				retcod, result = makeResult(RET_DANGER, "error: open file")
+				goto close
+			}
+			content, err := ioutil.ReadAll(file)
+			if err != nil {
+				retcod, result = makeResult(RET_DANGER, "error: read file")
+				goto close
+			}
+			file.Close()
+			head += FSEPARAT + files[i].Filename
+			body += FSEPARAT + gp.Base64Encode(content)
 		}
 		client := gp.NewClient(user.Priv, nil)
 		pack   := client.Encrypt(recv, newEmail(user.Name, head, body))
@@ -431,6 +455,8 @@ func networkReadPage(w http.ResponseWriter, r *http.Request) {
 	retcod, result := makeResult(RET_SUCCESS, "")
 	t, err := template.New("base.html").Funcs(template.FuncMap{
 		"split": strings.Split,
+		"texts": getTexts,
+		"files": getFiles,
 	}).ParseFiles(
 		PATH_VIEWS+"base.html",
 		PATH_VIEWS+"read.html",
@@ -442,6 +468,26 @@ func networkReadPage(w http.ResponseWriter, r *http.Request) {
 	user := SESSIONS.Get(r)
 	if user == nil {
 		http.Redirect(w, r, "/", 302)
+		return
+	}
+	if r.Method == "POST" {
+		pub := gp.StringToPublicKey(r.FormValue("public_key"))
+		if pub == nil {
+			fmt.Fprint(w, "error: public key is null")
+			return
+		}
+		dataString := gp.PublicKeyToString(pub)
+		qrCode, err := qr.Encode(dataString, qr.Q, qr.Auto)
+		if err != nil {
+			fmt.Fprint(w, "error: qrcode generate")
+			return
+		}
+		qrCode, err = barcode.Scale(qrCode, 768, 768)
+		if err != nil {
+			fmt.Fprint(w, "error: qrcode scale")
+			return
+		}
+		png.Encode(w, qrCode)
 		return
 	}
 	var email *Email
@@ -731,6 +777,28 @@ func readEmails(user *User, addr string) {
 			break
 		}
 	}
+}
+
+func getTexts(email *Email) [2]string {
+	head := strings.Split(email.Head, FSEPARAT)[0]
+	body := strings.Split(email.Body, FSEPARAT)[0]
+	return [2]string{
+		head,
+		body,
+	}
+}
+
+func getFiles(email *Email) [][2]string {
+	var list [][2]string
+	name := strings.Split(email.Head, FSEPARAT)[1:]
+	data := strings.Split(email.Body, FSEPARAT)[1:]
+	for i := range name {
+		list = append(list, [2]string{
+			name[i], 
+			data[i],
+		})
+	}
+	return list
 }
 
 func newEmail(sender, head, body string) *gp.Package {
