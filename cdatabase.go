@@ -251,6 +251,11 @@ func (db *DB) SetEmail(user *User, pack *gp.Package) error {
 	if head == "" || body == "" {
 		return fmt.Errorf("head or body is null")
 	}
+	heads := strings.Split(head, FSEPARAT)
+	bodys := strings.Split(body, FSEPARAT)
+	if len(heads) != len(bodys) {
+		return fmt.Errorf("len.head != len.body")
+	}
 	_, err = db.ptr.Exec(
 		"INSERT INTO emails (id_user, hash, spubl, sname, head, body, addtime) VALUES ($1, $2, $3, $4, $5, $6, $7)",
 		user.Id,

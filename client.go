@@ -29,7 +29,7 @@ type TemplateResult struct {
 const (
 	TMESSAGE = "\005\007\001\000\001\007\005"
 	FSEPARAT = "\001\007\005\000\005\007\001"
-	MAXESIZE = (5 << 20) // 5MiB
+	MAXESIZE = (8 << 20) // 8MiB
 	POWSDIFF = 25
 	MAXEPAGE = 5
 	MAXCOUNT = 5
@@ -430,11 +430,16 @@ func networkWritePage(w http.ResponseWriter, r *http.Request) {
 			Recv: gp.HashPublicKey(recv),
 			Data: gp.SerializePackage(pack),
 		}
+		if len(req.Data) > MAXESIZE {
+			retcod, result = makeResult(RET_DANGER, "error: max size")
+			goto close
+		}
 		for _, conn := range conns {
 			pasw := gp.HashSum([]byte(conn[1]))
 			req.Macp = gp.Base64Encode(gp.EncryptAES(pasw, hash))
 			go writeEmails(conn[0], serialize(req))
 		}
+		result = "success: email send"
 	}
 close:
 	t.Execute(w, WriteTemplateResult{

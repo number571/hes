@@ -14,7 +14,7 @@ import (
 
 const (
 	TMESSAGE = "\005\007\001\000\001\007\005"
-	MAXESIZE = (5 << 20) // 5MiB
+	MAXESIZE = (8 << 20) // 8MiB
 	POWSDIFF = 25
 )
 
