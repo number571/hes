@@ -3,59 +3,24 @@ package main
 import (
 	"bytes"
 	"encoding/json"
-	"flag"
 	"fmt"
 	gp "github.com/number571/gopeer"
-	"golang.org/x/net/proxy"
 	"net/http"
-	"net/url"
 	"time"
 )
 
-const (
-	TMESSAGE = "\005\007\001\000\001\007\005"
-	MAXESIZE = (8 << 20) // 8MiB
-	POWSDIFF = 25
-)
-
 var (	
-	FLCONFIG = NewCFG("server.cfg")
 	DATABASE = NewDB("server.db")
-	HTCLIENT = new(http.Client)
-	OPENADDR = ""
+	FLCONFIG = NewCFG("server.cfg")
 )
 
 func init() {
-	socks5Ptr := flag.String("socks5", "", "enable socks5 and create proxy connection")
-	addrPtr := flag.String("open", "localhost:8080", "open address for hidden email server")
-	flag.Parse()
-	OPENADDR = *addrPtr
-	if *socks5Ptr != "" {
-		socks5, err := url.Parse("socks5://" + *socks5Ptr)
-		if err != nil {
-			panic("error: socks5 conn")
-		}
-		dialer, err := proxy.FromURL(socks5, proxy.Direct)
-		if err != nil {
-			panic("error: dialer")
-		}
-		HTCLIENT = &http.Client{
-			Transport: &http.Transport{Dial: dialer.Dial},
-			Timeout:   time.Second * 15,
-		}
-	}
-	packageDifficulty(POWSDIFF)
-	go delEmailsByTime(24*time.Hour, 6*time.Hour)
+	go delOldEmailsByTime(24*time.Hour, 6*time.Hour)
+	hesDefaultInit("localhost:8080")
 	fmt.Println("Server is listening...\n")
 }
 
-func packageDifficulty(bits int) {
-	gp.Set(gp.SettingsType{
-		"POWS_DIFF": uint(bits),
-	})
-}
-
-func delEmailsByTime(deltime, period time.Duration) {
+func delOldEmailsByTime(deltime, period time.Duration) {
 	for {
 		DATABASE.DelEmailsByTime(deltime)
 		time.Sleep(period)

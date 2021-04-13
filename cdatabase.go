@@ -13,8 +13,8 @@ import (
 )
 
 const (
-	DIFF_ENTR = 20 // bits
-	IS_EMAIL  = "IS-EMAIL"
+	PASWDIFF = 25 // bits
+	IS_EMAIL = "IS-EMAIL"
 )
 
 func NewDB(name string) *DB {
@@ -28,8 +28,8 @@ PRAGMA secure_delete=ON;
 CREATE TABLE IF NOT EXISTS users (
 	id   INTEGER,
 	f2f  BOOLEAN,
-	name NVARCHAR(255) UNIQUE,
-	pasw VARCHAR(255),
+	hashn VARCHAR(255) UNIQUE,
+	hashp VARCHAR(255),
 	salt VARCHAR(255),
 	priv TEXT,
 	PRIMARY KEY(id)
@@ -59,8 +59,8 @@ CREATE TABLE IF NOT EXISTS emails (
 	deleted BOOLEAN DEFAULT 0,
 	hash    VARCHAR(255) UNIQUE,
 	spubl   TEXT,
-	sname   VARCHAR(255),
-	head    VARCHAR(255),
+	sname   NVARCHAR(255),
+	head    NVARCHAR(255),
 	body    TEXT,
 	addtime TEXT,
 	PRIMARY KEY(id),
@@ -82,7 +82,7 @@ func (db *DB) StateF2F(user *User) bool {
 		f2f bool
 	)
 	row := db.ptr.QueryRow(
-		"SELECT f2f FROM users WHERE name=$1",
+		"SELECT f2f FROM users WHERE hashn=$1",
 		gp.Base64Encode(gp.HashSum([]byte(user.Name))),
 	)
 	row.Scan(&f2f)
@@ -94,7 +94,7 @@ func (db *DB) SwitchF2F(user *User) error {
 	db.mtx.Lock()
 	defer db.mtx.Unlock()
 	_, err := db.ptr.Exec(
-		"UPDATE users SET f2f=$1 WHERE name=$2",
+		"UPDATE users SET f2f=$1 WHERE hashn=$2",
 		f2f,
 		gp.Base64Encode(gp.HashSum([]byte(user.Name))),
 	)
@@ -105,11 +105,20 @@ func (db *DB) SetUser(name, pasw string, priv *rsa.PrivateKey) error {
 	db.mtx.Lock()
 	defer db.mtx.Unlock()
 	name = strings.TrimSpace(name)
+	if len(name) < 6 || len(name) > 64 {
+		return fmt.Errorf("need len username >= 6 and <= 64")
+	}
+	if len(pasw) < 8 {
+		return fmt.Errorf("need len password >= 8")
+	}
+	if priv == nil {
+		priv = gp.GenerateKey(gp.Get("AKEY_SIZE").(uint))
+	}
 	if db.userExist(name) {
 		return fmt.Errorf("user already exist")
 	}
 	salt := gp.GenerateBytes(32)
-	bpasw := gp.RaiseEntropy([]byte(pasw), salt, DIFF_ENTR)
+	bpasw := gp.RaiseEntropy([]byte(pasw), salt, PASWDIFF)
 	hpasw := gp.HashSum(bytes.Join(
 		[][]byte{
 			bpasw,
@@ -118,7 +127,7 @@ func (db *DB) SetUser(name, pasw string, priv *rsa.PrivateKey) error {
 		[]byte{},
 	))
 	_, err := db.ptr.Exec(
-		"INSERT INTO users (name, pasw, salt, priv, f2f) VALUES ($1, $2, $3, $4, 0)",
+		"INSERT INTO users (hashn, hashp, salt, priv, f2f) VALUES ($1, $2, $3, $4, 0)",
 		gp.Base64Encode(gp.HashSum([]byte(name))),
 		gp.Base64Encode(hpasw),
 		gp.Base64Encode(salt),
@@ -138,7 +147,7 @@ func (db *DB) GetUser(name, pasw string) *User {
 	)
 	name = strings.TrimSpace(name)
 	row := db.ptr.QueryRow(
-		"SELECT id, pasw, salt, priv FROM users WHERE name=$1",
+		"SELECT id, hashp, salt, priv FROM users WHERE hashn=$1",
 		gp.Base64Encode(gp.HashSum([]byte(name))),
 	)
 	row.Scan(&id, &hpasw, &ssalt, &spriv)
@@ -146,7 +155,7 @@ func (db *DB) GetUser(name, pasw string) *User {
 		return nil
 	}
 	salt := gp.Base64Decode(ssalt)
-	bpasw := gp.RaiseEntropy([]byte(pasw), salt, DIFF_ENTR)
+	bpasw := gp.RaiseEntropy([]byte(pasw), salt, PASWDIFF)
 	chpasw := gp.HashSum(bytes.Join(
 		[][]byte{
 			bpasw,
@@ -429,7 +438,7 @@ func (db *DB) userExist(name string) bool {
 		namee string
 	)
 	row := db.ptr.QueryRow(
-		"SELECT name FROM users WHERE name=$1",
+		"SELECT name FROM users WHERE hashn=$1",
 		gp.Base64Encode(gp.HashSum([]byte(name))),
 	)
 	row.Scan(&namee)

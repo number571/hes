@@ -3,17 +3,14 @@ package main
 import (
 	"bytes"
 	"encoding/json"
-	"flag"
 	"fmt"
 	"io/ioutil"
 	"github.com/boombuler/barcode"
 	"github.com/boombuler/barcode/qr"
 	gp "github.com/number571/gopeer"
-	"golang.org/x/net/proxy"
 	"html/template"
 	"image/png"
 	"net/http"
-	"net/url"
 	"os"
 	"strconv"
 	"strings"
@@ -27,12 +24,9 @@ type TemplateResult struct {
 }
 
 const (
-	TMESSAGE = "\005\007\001\000\001\007\005"
 	FSEPARAT = "\001\007\005\000\005\007\001"
-	MAXESIZE = (8 << 20) // 8MiB
-	POWSDIFF = 25
-	MAXEPAGE = 5
-	MAXCOUNT = 5
+	MAXEPAGE = 5 // view emails in one page
+	MAXCOUNT = 5 // load emails from one node
 )
 
 const (
@@ -47,40 +41,14 @@ const (
 )
 
 var (
-	OPENADDR = ""
-	HTCLIENT = new(http.Client)
 	DATABASE = NewDB("client.db")
 	SESSIONS = NewSessions()
 )
 
 func init() {
-	socks5Ptr := flag.String("socks5", "", "enable socks5 and create proxy connection")
-	addrPtr := flag.String("open", "localhost:7545", "open address for gui application")
-	flag.Parse()
-	OPENADDR = *addrPtr
-	if *socks5Ptr != "" {
-		socks5, err := url.Parse("socks5://" + *socks5Ptr)
-		if err != nil {
-			panic("error: socks5 conn")
-		}
-		dialer, err := proxy.FromURL(socks5, proxy.Direct)
-		if err != nil {
-			panic("error: dialer")
-		}
-		HTCLIENT = &http.Client{
-			Transport: &http.Transport{Dial: dialer.Dial},
-			Timeout:   time.Second * 15,
-		}
-	}
-	packageDifficulty(POWSDIFF)
 	go delOldSessionsByTime(1*time.Hour, 15*time.Minute)
+	hesDefaultInit("localhost:7545")
 	fmt.Println("Client is listening...\n")
-}
-
-func packageDifficulty(bits int) {
-	gp.Set(gp.SettingsType{
-		"POWS_DIFF": uint(bits),
-	})
 }
 
 func delOldSessionsByTime(deltime, period time.Duration) {
@@ -147,18 +115,10 @@ func signupPage(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if r.Method == "POST" {
-		name := strings.TrimSpace(r.FormValue("username"))
-		pasw := r.FormValue("password")
+		name  := r.FormValue("username")
+		pasw  := r.FormValue("password")
 		spriv := r.FormValue("private_key")
-		priv := gp.StringToPrivateKey(spriv)
-		if len(name) < 6 || len(name) > 64 {
-			retcod, result = makeResult(RET_DANGER, "error: need len username >= 6 and <= 64")
-			goto close
-		}
-		if len(pasw) < 8 {
-			retcod, result = makeResult(RET_DANGER, "error: need len password >= 8")
-			goto close
-		}
+		priv  := gp.StringToPrivateKey(spriv)
 		if pasw != r.FormValue("password_repeat") {
 			retcod, result = makeResult(RET_DANGER, "error: passwords not equal")
 			goto close
@@ -167,12 +127,10 @@ func signupPage(w http.ResponseWriter, r *http.Request) {
 			retcod, result = makeResult(RET_DANGER, "error: private key is not valid")
 			goto close
 		}
-		if priv == nil {
-			priv = gp.GenerateKey(gp.Get("AKEY_SIZE").(uint))
-		}
 		err := DATABASE.SetUser(name, pasw, priv)
 		if err != nil {
-			retcod, result = makeResult(RET_DANGER, "error: username already exist")
+			retcod, result = makeResult(RET_DANGER, 
+				fmt.Sprintf("error: %s", err.Error()))
 			goto close
 		}
 		http.Redirect(w, r, "/signin", 302)
@@ -362,6 +320,8 @@ close:
 	})
 }
 
+// head = title   || FS || filename[0]     || ... || FS || filename[n]
+// body = message || FS || base64(file[0]) || ... || FS || base64(file[n]) 
 func networkWritePage(w http.ResponseWriter, r *http.Request) {
 	type WriteTemplateResult struct {
 		TemplateResult

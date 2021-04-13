@@ -1,6 +1,6 @@
 # HES
 
-> Hidden email service. Version 1.1.8s.
+> Hidden email service. Version 1.1.9s.
 
 ### Home page
 <img src="/userside/images/HES1.png" alt="HomePage"/>
@@ -18,8 +18,8 @@
 ### Compile and run
 ```
 $ make
-> go build client.go cdatabase.go cmodels.go csessions.go
-> go build server.go sdatabase.go sconfig.go
+> go build client.go consts.go cdatabase.go cmodels.go csessions.go
+> go build server.go consts.go sdatabase.go sconfig.go
 $ ./server -open="localhost:8080" &
 $ ./client -open="localhost:7545"
 ```
@@ -55,15 +55,15 @@ type CFG struct {
 
 #### Client side db (client.db)
 ```sql
-/* !key_pasw = hash(password, salt)^20 */
-/* name      = hash(nickname) */
-/* pasw      = hash(!key_pasw, nickname) */
+/* !key_pasw = hash(password, salt)^25 */
+/* hashn     = hash(nickname) */
+/* hashp     = hash(!key_pasw, nickname) */
 /* priv      = encrypt[!key_pasw](private_key) */
 CREATE TABLE IF NOT EXISTS users (
 	id   INTEGER,
 	f2f  BOOLEAN,
-	name NVARCHAR(255) UNIQUE,
-	pasw VARCHAR(255),
+	hashn VARCHAR(255) UNIQUE,
+	hashp VARCHAR(255),
 	salt VARCHAR(255),
 	priv TEXT,
 	PRIMARY KEY(id)
@@ -106,8 +106,8 @@ CREATE TABLE IF NOT EXISTS emails (
 	deleted BOOLEAN DEFAULT 0,
 	hash    VARCHAR(255) UNIQUE,
 	spubl   TEXT,
-	sname   VARCHAR(255),
-	head    VARCHAR(255),
+	sname   NVARCHAR(255),
+	head    NVARCHAR(255),
 	body    TEXT,
 	addtime TEXT,
 	PRIMARY KEY(id),

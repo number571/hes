@@ -60,8 +60,7 @@
 			  	<div class="card-body row">
 			    	{{ range $files }}
 			    		<div class="text-white bg-dark col-md-4">
-			    			<h6 class="card-header bg-secondary">{{ index . 0 }}</h6>
-			    			<a class="btn btn-dark card-body w-100" download="{{ index . 0 }}" href="data:text/plain;base64,{{ index . 1 }}">Download</a>
+			    			<a title="Filename: {{ index . 0 }}" class="btn btn-success card-body text-truncate w-100" download="{{ index . 0 }}" href="data:text/plain;base64,{{ index . 1 }}">{{ index . 0 }}</a>
 			    		</div>
 			    	{{ end }}
 			  	</div>
