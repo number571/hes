@@ -3,6 +3,7 @@ package main
 import (
 	"database/sql"
 	_ "github.com/mattn/go-sqlite3"
+	gp "github.com/number571/gopeer"
 	"sync"
 	"time"
 )
@@ -36,14 +37,14 @@ CREATE TABLE IF NOT EXISTS emails (
 	}
 }
 
-func (db *DB) SetEmail(recv, hash, data string) error {
+func (db *DB) SetEmail(recv string, pack *gp.Package) error {
 	db.mtx.Lock()
 	defer db.mtx.Unlock()
 	_, err := db.ptr.Exec(
 		"INSERT INTO emails (recv, hash, data) VALUES ($1, $2, $3)",
 		recv,
-		hash,
-		data,
+		gp.Base64Encode(pack.Body.Hash),
+		string(gp.SerializePackage(pack)),
 	)
 	return err
 }

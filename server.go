@@ -9,7 +9,7 @@ import (
 	"time"
 )
 
-var (	
+var (
 	DATABASE = NewDB("server.db")
 	FLCONFIG = NewCFG("server.cfg")
 )
@@ -52,7 +52,7 @@ func indexPage(w http.ResponseWriter, r *http.Request) {
 		response(w, 0, "hidden email service")
 		return
 	}
-	if r.ContentLength > MAXESIZE {
+	if r.ContentLength > int64(MAXESIZE) {
 		response(w, 1, "error: max size")
 		return
 	}
@@ -80,7 +80,7 @@ func emailSendPage(w http.ResponseWriter, r *http.Request) {
 		response(w, 1, "error: method != POST")
 		return
 	}
-	if r.ContentLength > MAXESIZE {
+	if r.ContentLength > int64(MAXESIZE) {
 		response(w, 2, "error: max size")
 		return
 	}
@@ -89,14 +89,13 @@ func emailSendPage(w http.ResponseWriter, r *http.Request) {
 		response(w, 3, "error: parse json")
 		return
 	}
-	pack := gp.DeserializePackage(req.Data)
+	pack := gp.DeserializePackage([]byte(req.Data))
 	if pack == nil {
 		response(w, 4, "error: deserialize package")
 		return
 	}
-	hash := gp.Base64Decode(pack.Body.Hash)
-	powd := gp.Get("POWS_DIFF").(uint)
-	if !gp.ProofIsValid(hash, powd, pack.Body.Npow) {
+	hash := pack.Body.Hash
+	if !gp.ProofIsValid(hash, POWSDIFF, pack.Body.Npow) {
 		response(w, 5, "error: proof of work")
 		return
 	}
@@ -106,7 +105,7 @@ func emailSendPage(w http.ResponseWriter, r *http.Request) {
 		response(w, 6, "error: message authentication code")
 		return
 	}
-	err = DATABASE.SetEmail(req.Recv, pack.Body.Hash, req.Data)
+	err = DATABASE.SetEmail(req.Recv, pack)
 	if err != nil {
 		response(w, 7, "error: save email")
 		return
@@ -139,7 +138,7 @@ func emailRecvPage(w http.ResponseWriter, r *http.Request) {
 		response(w, 1, "error: method != POST")
 		return
 	}
-	if r.ContentLength > MAXESIZE {
+	if r.ContentLength > int64(MAXESIZE) {
 		response(w, 2, "error: max size")
 		return
 	}

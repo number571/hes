@@ -4,12 +4,12 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
 	"github.com/boombuler/barcode"
 	"github.com/boombuler/barcode/qr"
 	gp "github.com/number571/gopeer"
 	"html/template"
 	"image/png"
+	"io/ioutil"
 	"net/http"
 	"os"
 	"strconv"
@@ -115,10 +115,10 @@ func signupPage(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if r.Method == "POST" {
-		name  := r.FormValue("username")
-		pasw  := r.FormValue("password")
+		name := r.FormValue("username")
+		pasw := r.FormValue("password")
 		spriv := r.FormValue("private_key")
-		priv  := gp.StringToPrivateKey(spriv)
+		priv := gp.StringToPrivateKey(spriv)
 		if pasw != r.FormValue("password_repeat") {
 			retcod, result = makeResult(RET_DANGER, "error: passwords not equal")
 			goto close
@@ -127,9 +127,12 @@ func signupPage(w http.ResponseWriter, r *http.Request) {
 			retcod, result = makeResult(RET_DANGER, "error: private key is not valid")
 			goto close
 		}
+		if priv == nil {
+			priv = gp.GenerateKey(gp.Get("AKEY_SIZE").(uint))
+		}
 		err := DATABASE.SetUser(name, pasw, priv)
 		if err != nil {
-			retcod, result = makeResult(RET_DANGER, 
+			retcod, result = makeResult(RET_DANGER,
 				fmt.Sprintf("error: %s", err.Error()))
 			goto close
 		}
@@ -273,8 +276,8 @@ func networkPage(w http.ResponseWriter, r *http.Request) {
 	page := 0
 	retcod, result := makeResult(RET_SUCCESS, "")
 	t, err := template.New("base.html").Funcs(template.FuncMap{
-		"inc": func(x int) int { return x + 1 },
-		"dec": func(x int) int { return x - 1 },
+		"inc":   func(x int) int { return x + 1 },
+		"dec":   func(x int) int { return x - 1 },
 		"texts": getTexts,
 	}).ParseFiles(
 		PATH_VIEWS+"base.html",
@@ -320,8 +323,9 @@ close:
 	})
 }
 
+// FS = FSEPARAT
 // head = title   || FS || filename[0]     || ... || FS || filename[n]
-// body = message || FS || base64(file[0]) || ... || FS || base64(file[n]) 
+// body = message || FS || base64(file[0]) || ... || FS || base64(file[n])
 func networkWritePage(w http.ResponseWriter, r *http.Request) {
 	type WriteTemplateResult struct {
 		TemplateResult
@@ -350,7 +354,7 @@ func networkWritePage(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if r.Method == "POST" {
-		err := r.ParseMultipartForm(MAXESIZE)
+		err := r.ParseMultipartForm(int64(MAXESIZE))
 		if err != nil {
 			retcod, result = makeResult(RET_DANGER, "error: max size")
 			goto close
@@ -383,14 +387,15 @@ func networkWritePage(w http.ResponseWriter, r *http.Request) {
 			body += FSEPARAT + gp.Base64Encode(content)
 		}
 		client := gp.NewClient(user.Priv, nil)
-		pack   := client.Encrypt(recv, newEmail(user.Name, head, body))
-		hash   := gp.Base64Decode(pack.Body.Hash)
-		conns  := DATABASE.GetConns(user)
-		req    := Req{
+		pack := client.Encrypt(
+			recv, newEmail(user.Name, head, body), POWSDIFF)
+		hash := pack.Body.Hash
+		conns := DATABASE.GetConns(user)
+		req := Req{
 			Recv: gp.HashPublicKey(recv),
-			Data: gp.SerializePackage(pack),
+			Data: string(gp.SerializePackage(pack)),
 		}
-		if len(req.Data) > MAXESIZE {
+		if uint(len(req.Data)) > MAXESIZE {
 			retcod, result = makeResult(RET_DANGER, "error: max size")
 			goto close
 		}
@@ -480,7 +485,7 @@ close:
 func networkContactPage(w http.ResponseWriter, r *http.Request) {
 	type ContactTemplateResult struct {
 		TemplateResult
-		F2F bool
+		F2F      bool
 		Contacts map[string]string
 	}
 	retcod, result := makeResult(RET_SUCCESS, "")
@@ -500,29 +505,23 @@ func networkContactPage(w http.ResponseWriter, r *http.Request) {
 		DATABASE.SwitchF2F(user)
 	}
 	if r.Method == "POST" && r.FormValue("append") != "" {
-		name := strings.TrimSpace(r.FormValue("nickname"))
-		if name == "" {
-			retcod, result = makeResult(RET_DANGER, "error: nickname is null")
-			goto close
-		}
+		name := r.FormValue("nickname")
 		publ := gp.StringToPublicKey(r.FormValue("public_key"))
-		if publ == nil {
-			retcod, result = makeResult(RET_DANGER, "error: public key is null")
-			goto close
-		}
 		err := DATABASE.SetContact(user, name, publ)
 		if err != nil {
-			retcod, result = makeResult(RET_DANGER, "error: contact already exist")
+			retcod, result = makeResult(RET_DANGER,
+				fmt.Sprintf("error: %s", err.Error()))
 			goto close
 		}
 	}
 	if r.Method == "POST" && r.FormValue("delete") != "" {
 		publ := gp.StringToPublicKey(r.FormValue("public_key"))
-		if publ == nil {
-			retcod, result = makeResult(RET_DANGER, "error: public key is null")
+		err := DATABASE.DelContact(user, publ)
+		if err != nil {
+			retcod, result = makeResult(RET_DANGER,
+				fmt.Sprintf("error: %s", err.Error()))
 			goto close
 		}
-		DATABASE.DelContact(user, publ)
 	}
 close:
 	t.Execute(w, ContactTemplateResult{
@@ -531,7 +530,7 @@ close:
 			Result: result,
 			Return: retcod,
 		},
-		F2F: DATABASE.StateF2F(user),
+		F2F:      DATABASE.StateF2F(user),
 		Contacts: DATABASE.GetContacts(user),
 	})
 }
@@ -569,21 +568,23 @@ func networkConnectPage(w http.ResponseWriter, r *http.Request) {
 		result = "success: all connections work"
 	}
 	if r.Method == "POST" && r.FormValue("append") != "" {
-		host := strings.TrimSpace(r.FormValue("hostname"))
-		if host == "" {
-			retcod, result = makeResult(RET_DANGER, "error: string is null")
+		host := r.FormValue("hostname")
+		pasw := r.FormValue("password")
+		err := DATABASE.SetConn(user, host, pasw)
+		if err != nil {
+			retcod, result = makeResult(RET_DANGER,
+				fmt.Sprintf("error: %s", err.Error()))
 			goto close
 		}
-		pasw := r.FormValue("password")
-		DATABASE.SetConn(user, host, pasw)
 	}
 	if r.Method == "POST" && r.FormValue("delete") != "" {
-		host := strings.TrimSpace(r.FormValue("hostname"))
-		if host == "" {
-			retcod, result = makeResult(RET_DANGER, "error: string is null")
+		host := r.FormValue("hostname")
+		err := DATABASE.DelConn(user, host)
+		if err != nil {
+			retcod, result = makeResult(RET_DANGER,
+				fmt.Sprintf("error: %s", err.Error()))
 			goto close
 		}
-		DATABASE.DelConn(user, host)
 	}
 close:
 	t.Execute(w, ConnTemplateResult{
@@ -615,21 +616,21 @@ func checkConnection(conn [2]string) (int, string) {
 		})),
 	)
 	if err != nil {
-		return makeResult(RET_DANGER, 
+		return makeResult(RET_DANGER,
 			fmt.Sprintf("%s='%s';\n", conn[0], "error: connect"))
 	}
-	if resp.ContentLength > MAXESIZE {
-		return makeResult(RET_DANGER, 
+	if resp.ContentLength > int64(MAXESIZE) {
+		return makeResult(RET_DANGER,
 			fmt.Sprintf("%s='%s';\n", conn[0], "error: max size"))
 	}
 	err = json.NewDecoder(resp.Body).Decode(&servresp)
 	resp.Body.Close()
 	if err != nil {
-		return makeResult(RET_DANGER, 
+		return makeResult(RET_DANGER,
 			fmt.Sprintf("%s='%s';\n", conn[0], "error: parse json"))
 	}
 	if servresp.Return != 0 {
-		return makeResult(RET_DANGER, 
+		return makeResult(RET_DANGER,
 			fmt.Sprintf("%s='%s';\n", conn[0], servresp.Result))
 	}
 	return makeResult(RET_SUCCESS, "")
@@ -653,7 +654,7 @@ func writeEmails(addr string, rdata []byte) {
 	if err != nil {
 		return
 	}
-	if resp.ContentLength > MAXESIZE {
+	if resp.ContentLength > int64(MAXESIZE) {
 		return
 	}
 	err = json.NewDecoder(resp.Body).Decode(&servresp)
@@ -690,7 +691,7 @@ func readEmails(user *User, addr string) {
 	if err != nil {
 		return
 	}
-	if resp.ContentLength > MAXESIZE {
+	if resp.ContentLength > int64(MAXESIZE) {
 		return
 	}
 	err = json.NewDecoder(resp.Body).Decode(&servresp)
@@ -718,7 +719,7 @@ func readEmails(user *User, addr string) {
 		if err != nil {
 			break
 		}
-		if resp.ContentLength > MAXESIZE {
+		if resp.ContentLength > int64(MAXESIZE) {
 			break
 		}
 		err = json.NewDecoder(resp.Body).Decode(&servresp)
@@ -729,8 +730,11 @@ func readEmails(user *User, addr string) {
 		if servresp.Return != 0 {
 			continue
 		}
-		pack := gp.DeserializePackage(servresp.Result)
-		pack = client.Decrypt(pack)
+		pack := gp.DeserializePackage([]byte(servresp.Result))
+		if pack == nil {
+			continue
+		}
+		pack = client.Decrypt(pack, POWSDIFF)
 		if pack == nil {
 			continue
 		}
@@ -759,7 +763,7 @@ func getFiles(email *Email) [][2]string {
 	data := strings.Split(email.Body, FSEPARAT)[1:]
 	for i := range name {
 		list = append(list, [2]string{
-			name[i], 
+			name[i],
 			data[i],
 		})
 	}
@@ -767,11 +771,11 @@ func getFiles(email *Email) [][2]string {
 }
 
 func newEmail(sender, head, body string) *gp.Package {
-	return gp.NewPackage(IS_EMAIL, string(serialize(Email{
+	return gp.NewPackage(IS_EMAIL, serialize(Email{
 		SenderName: sender,
 		Head:       head,
 		Body:       body,
-	})))
+	}))
 }
 
 func getName(user *User) string {

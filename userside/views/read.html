@@ -59,7 +59,7 @@
 				<h5 class="card-header bg-secondary">Files</h5>
 			  	<div class="card-body row">
 			    	{{ range $files }}
-			    		<div class="text-white bg-dark col-md-4">
+			    		<div class="text-white bg-dark col-md-4 mb-3">
 			    			<a title="Filename: {{ index . 0 }}" class="btn btn-success card-body text-truncate w-100" download="{{ index . 0 }}" href="data:text/plain;base64,{{ index . 1 }}">{{ index . 0 }}</a>
 			    		</div>
 			    	{{ end }}

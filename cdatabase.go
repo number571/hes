@@ -104,15 +104,15 @@ func (db *DB) SwitchF2F(user *User) error {
 func (db *DB) SetUser(name, pasw string, priv *rsa.PrivateKey) error {
 	db.mtx.Lock()
 	defer db.mtx.Unlock()
+	if priv == nil {
+		return fmt.Errorf("private key is null")
+	}
 	name = strings.TrimSpace(name)
 	if len(name) < 6 || len(name) > 64 {
 		return fmt.Errorf("need len username >= 6 and <= 64")
 	}
 	if len(pasw) < 8 {
 		return fmt.Errorf("need len password >= 8")
-	}
-	if priv == nil {
-		priv = gp.GenerateKey(gp.Get("AKEY_SIZE").(uint))
 	}
 	if db.userExist(name) {
 		return fmt.Errorf("user already exist")
@@ -226,7 +226,7 @@ func (db *DB) GetEmail(user *User, id int) *Email {
 	return &Email{
 		Id:         id,
 		Hash:       hash,
-		SenderPubl: string(gp.DecryptAES(user.Pasw, gp.Base64Decode(spubl))),
+		SenderPubl: gp.Base64Encode(gp.DecryptAES(user.Pasw, gp.Base64Decode(spubl))),
 		SenderName: string(gp.DecryptAES(user.Pasw, gp.Base64Decode(sname))),
 		Head:       string(gp.DecryptAES(user.Pasw, gp.Base64Decode(head))),
 		Body:       string(gp.DecryptAES(user.Pasw, gp.Base64Decode(body))),
@@ -235,7 +235,8 @@ func (db *DB) GetEmail(user *User, id int) *Email {
 }
 
 func (db *DB) SetEmail(user *User, pack *gp.Package) error {
-	if db.StateF2F(user) && !db.InContacts(user, pack.Head.Sender) {
+	pub := gp.BytesToPublicKey(pack.Head.Sender)
+	if db.StateF2F(user) && !db.InContacts(user, pub) {
 		return fmt.Errorf("sender not in contacts")
 	}
 	db.mtx.Lock()
@@ -243,7 +244,7 @@ func (db *DB) SetEmail(user *User, pack *gp.Package) error {
 	if pack.Head.Title != IS_EMAIL {
 		return fmt.Errorf("is not email")
 	}
-	if db.emailExist(user, pack.Body.Hash) {
+	if db.emailExist(user, gp.Base64Encode(pack.Body.Hash)) {
 		return fmt.Errorf("email already exist")
 	}
 	var email Email
@@ -269,7 +270,7 @@ func (db *DB) SetEmail(user *User, pack *gp.Package) error {
 		"INSERT INTO emails (id_user, hash, spubl, sname, head, body, addtime) VALUES ($1, $2, $3, $4, $5, $6, $7)",
 		user.Id,
 		hashWithSecret(user, pack.Body.Hash),
-		gp.Base64Encode(gp.EncryptAES(user.Pasw, []byte(pack.Head.Sender))),
+		gp.Base64Encode(gp.EncryptAES(user.Pasw, pack.Head.Sender)),
 		gp.Base64Encode(gp.EncryptAES(user.Pasw, []byte(name))),
 		gp.Base64Encode(gp.EncryptAES(user.Pasw, []byte(head))),
 		gp.Base64Encode(gp.EncryptAES(user.Pasw, []byte(body))),
@@ -314,13 +315,13 @@ func (db *DB) GetContacts(user *User) map[string]string {
 			break
 		}
 		name = string(gp.DecryptAES(user.Pasw, gp.Base64Decode(name)))
-		spub = string(gp.DecryptAES(user.Pasw, gp.Base64Decode(spub)))
+		spub = gp.Base64Encode(gp.DecryptAES(user.Pasw, gp.Base64Decode(spub)))
 		contacts[name] = spub
 	}
 	return contacts
 }
 
-func (db *DB) InContacts(user *User, spub string) bool {
+func (db *DB) InContacts(user *User, pub *rsa.PublicKey) bool {
 	db.mtx.Lock()
 	defer db.mtx.Unlock()
 	var (
@@ -329,7 +330,7 @@ func (db *DB) InContacts(user *User, spub string) bool {
 	row := db.ptr.QueryRow(
 		"SELECT name FROM contacts WHERE id_user=$1 AND hashp=$2",
 		user.Id,
-		hashWithSecret(user, spub),
+		hashWithSecret(user, gp.PublicKeyToBytes(pub)),
 	)
 	row.Scan(&namee)
 	return namee != ""
@@ -338,18 +339,24 @@ func (db *DB) InContacts(user *User, spub string) bool {
 func (db *DB) SetContact(user *User, name string, pub *rsa.PublicKey) error {
 	db.mtx.Lock()
 	defer db.mtx.Unlock()
+	if pub == nil {
+		return fmt.Errorf("public key is null")
+	}
 	name = strings.TrimSpace(name)
-	spub := gp.PublicKeyToString(pub)
-	if db.contactExist(user, name, spub) {
+	if len(name) == 0 {
+		return fmt.Errorf("nickname is null")
+	}
+	if db.contactExist(user, name, pub) {
 		return fmt.Errorf("contact already exist")
 	}
+	spub := gp.PublicKeyToBytes(pub)
 	_, err := db.ptr.Exec(
 		"INSERT INTO contacts (id_user, hashn, hashp, name, publ) VALUES ($1, $2, $3, $4, $5)",
 		user.Id,
-		hashWithSecret(user, name),
+		hashWithSecret(user, []byte(name)),
 		hashWithSecret(user, spub),
 		gp.Base64Encode(gp.EncryptAES(user.Pasw, []byte(name))),
-		gp.Base64Encode(gp.EncryptAES(user.Pasw, []byte(spub))),
+		gp.Base64Encode(gp.EncryptAES(user.Pasw, spub)),
 	)
 	return err
 }
@@ -357,11 +364,13 @@ func (db *DB) SetContact(user *User, name string, pub *rsa.PublicKey) error {
 func (db *DB) DelContact(user *User, pub *rsa.PublicKey) error {
 	db.mtx.Lock()
 	defer db.mtx.Unlock()
-	spub := gp.PublicKeyToString(pub)
+	if pub == nil {
+		return fmt.Errorf("public key is null")
+	}
 	_, err := db.ptr.Exec(
 		"DELETE FROM contacts WHERE id_user=$1 AND hashp=$2",
 		user.Id,
-		hashWithSecret(user, spub),
+		hashWithSecret(user, gp.PublicKeyToBytes(pub)),
 	)
 	return err
 }
@@ -402,19 +411,22 @@ func (db *DB) SetConn(user *User, host, pasw string) error {
 	db.mtx.Lock()
 	defer db.mtx.Unlock()
 	host = strings.TrimSpace(host)
+	if len(host) == 0 {
+		return fmt.Errorf("host is null")
+	}
 	if db.connExist(user, host) {
 		_, err := db.ptr.Exec(
 			"UPDATE connects SET pasw=$1 WHERE id_user=$2 AND hash=$3",
 			gp.Base64Encode(gp.EncryptAES(user.Pasw, []byte(pasw))),
 			user.Id,
-			hashWithSecret(user, host),
+			hashWithSecret(user, []byte(host)),
 		)
 		return err
 	}
 	_, err := db.ptr.Exec(
 		"INSERT INTO connects (id_user, hash, host, pasw) VALUES ($1, $2, $3, $4)",
 		user.Id,
-		hashWithSecret(user, host),
+		hashWithSecret(user, []byte(host)),
 		gp.Base64Encode(gp.EncryptAES(user.Pasw, []byte(host))),
 		gp.Base64Encode(gp.EncryptAES(user.Pasw, []byte(pasw))),
 	)
@@ -425,10 +437,13 @@ func (db *DB) DelConn(user *User, host string) error {
 	db.mtx.Lock()
 	defer db.mtx.Unlock()
 	host = strings.TrimSpace(host)
+	if len(host) == 0 {
+		return fmt.Errorf("host is null")
+	}
 	_, err := db.ptr.Exec(
 		"DELETE FROM connects WHERE id_user=$1 AND hash=$2",
 		user.Id,
-		hashWithSecret(user, host),
+		hashWithSecret(user, []byte(host)),
 	)
 	return err
 }
@@ -445,15 +460,15 @@ func (db *DB) userExist(name string) bool {
 	return namee != ""
 }
 
-func (db *DB) contactExist(user *User, name, spub string) bool {
+func (db *DB) contactExist(user *User, name string, pub *rsa.PublicKey) bool {
 	var (
 		namee string
 	)
 	row := db.ptr.QueryRow(
 		"SELECT name FROM contacts WHERE id_user=$1 AND (hashn=$2 OR hashp=$3)",
 		user.Id,
-		hashWithSecret(user, name),
-		hashWithSecret(user, spub),
+		hashWithSecret(user, []byte(name)),
+		hashWithSecret(user, gp.PublicKeyToBytes(pub)),
 	)
 	row.Scan(&namee)
 	return namee != ""
@@ -463,11 +478,10 @@ func (db *DB) connExist(user *User, host string) bool {
 	var (
 		hoste string
 	)
-	host = strings.TrimSpace(host)
 	row := db.ptr.QueryRow(
 		"SELECT host FROM connects WHERE id_user=$1 AND hash=$2",
 		user.Id,
-		hashWithSecret(user, host),
+		hashWithSecret(user, []byte(host)),
 	)
 	row.Scan(&hoste)
 	return hoste != ""
@@ -480,16 +494,16 @@ func (db *DB) emailExist(user *User, hash string) bool {
 	row := db.ptr.QueryRow(
 		"SELECT hash FROM emails WHERE id_user=$1 AND hash=$2",
 		user.Id,
-		hashWithSecret(user, hash),
+		hashWithSecret(user, []byte(hash)),
 	)
 	row.Scan(&hashe)
 	return hashe != ""
 }
 
-func hashWithSecret(user *User, data string) string {
+func hashWithSecret(user *User, data []byte) string {
 	return gp.Base64Encode(gp.HashSum(bytes.Join(
 		[][]byte{
-			[]byte(data),
+			data,
 			user.Pasw,
 		},
 		[]byte{},

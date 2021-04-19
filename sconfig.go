@@ -1,20 +1,22 @@
 package main
 
 import (
-	"os"
 	"encoding/json"
 	"io/ioutil"
+	"os"
 )
 
 type CFG struct {
 	Pasw  string      `json:"pasw"`
 	Conns [][2]string `json:"conns"`
-	// conn[0] = addr
-	// conn[1] = pasw
 }
 
 func NewCFG(filename string) *CFG {
 	var config = new(CFG)
+	config.Conns = append(config.Conns, [2]string{
+		"addr",
+		"pasw",
+	})
 	if !fileIsExist(filename) {
 		err := ioutil.WriteFile(filename, serialize(config), 0644)
 		if err != nil {
