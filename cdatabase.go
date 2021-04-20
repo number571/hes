@@ -14,7 +14,7 @@ import (
 
 const (
 	PASWDIFF = 25 // bits
-	IS_EMAIL = "IS-EMAIL"
+	IS_EMAIL = "[IS-EMAIL]"
 )
 
 func NewDB(name string) *DB {
@@ -117,7 +117,7 @@ func (db *DB) SetUser(name, pasw string, priv *rsa.PrivateKey) error {
 	if db.userExist(name) {
 		return fmt.Errorf("user already exist")
 	}
-	salt := gp.GenerateBytes(32)
+	salt := gp.GenerateBytes(gp.Get("RAND_SIZE").(uint))
 	bpasw := gp.RaiseEntropy([]byte(pasw), salt, PASWDIFF)
 	hpasw := gp.HashSum(bytes.Join(
 		[][]byte{

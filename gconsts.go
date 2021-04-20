@@ -5,6 +5,7 @@ import (
 	gp "github.com/number571/gopeer"
 	"golang.org/x/net/proxy"
 	"net/http"
+	"encoding/json"
 	"net/url"
 	"time"
 )
@@ -48,4 +49,12 @@ func hesDefaultInit(address string) {
 	})
 	MAXESIZE = gp.Get("PACK_SIZE").(uint)
 	POWSDIFF = gp.Get("POWS_DIFF").(uint)
+}
+
+func serialize(data interface{}) []byte {
+	res, err := json.MarshalIndent(data, "", "\t")
+	if err != nil {
+		return nil
+	}
+	return res
 }

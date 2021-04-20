@@ -788,11 +788,3 @@ func getName(user *User) string {
 func makeResult(retcod int, result string) (int, string) {
 	return retcod, result
 }
-
-func serialize(data interface{}) []byte {
-	res, err := json.MarshalIndent(data, "", "\t")
-	if err != nil {
-		return nil
-	}
-	return res
-}

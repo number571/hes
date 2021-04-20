@@ -169,11 +169,3 @@ func response(w http.ResponseWriter, ret int, res string) {
 	resp.Return = ret
 	json.NewEncoder(w).Encode(resp)
 }
-
-func serialize(data interface{}) []byte {
-	res, err := json.MarshalIndent(data, "", "\t")
-	if err != nil {
-		return nil
-	}
-	return res
-}
