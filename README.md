@@ -18,8 +18,8 @@
 ### Compile and run
 ```
 $ make
-> go build client.go consts.go cdatabase.go cmodels.go csessions.go
-> go build server.go consts.go sdatabase.go sconfig.go
+> go build client.go gconsts.go cdatabase.go cmodels.go csessions.go
+> go build server.go gconsts.go sdatabase.go sconfig.go
 $ ./server -open="localhost:8080" &
 $ ./client -open="localhost:7545"
 ```
