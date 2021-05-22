@@ -48,7 +48,7 @@ var (
 func init() {
 	go delOldSessionsByTime(1*time.Hour, 15*time.Minute)
 	hesDefaultInit("localhost:7545")
-	fmt.Println("Client is listening...\n")
+	fmt.Printf("Client is listening [%s] ...\n\n", OPENADDR)
 }
 
 func delOldSessionsByTime(deltime, period time.Duration) {
@@ -647,7 +647,7 @@ func writeEmails(addr string, rdata []byte) {
 	}
 	var servresp Resp
 	resp, err := HTCLIENT.Post(
-		"http://"+addr+"/email/send",
+		addr+"/email/send",
 		"application/json",
 		bytes.NewReader(rdata),
 	)
@@ -681,7 +681,7 @@ func readEmails(user *User, addr string) {
 	pbhash := gp.HashPublicKey(client.PublicKey())
 	// GET SIZE EMAILS
 	resp, err := HTCLIENT.Post(
-		"http://"+addr+"/email/recv",
+		addr+"/email/recv",
 		"application/json",
 		bytes.NewReader(serialize(Req{
 			Recv: pbhash,
@@ -709,7 +709,7 @@ func readEmails(user *User, addr string) {
 	}
 	for i, count := 1, 0; i <= size; i++ {
 		resp, err := HTCLIENT.Post(
-			"http://"+addr+"/email/recv",
+			addr+"/email/recv",
 			"application/json",
 			bytes.NewReader(serialize(Req{
 				Recv: pbhash,

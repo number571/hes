@@ -17,7 +17,7 @@ var (
 func init() {
 	go delOldEmailsByTime(24*time.Hour, 6*time.Hour)
 	hesDefaultInit("localhost:8080")
-	fmt.Println("Server is listening...\n")
+	fmt.Printf("Server is listening [%s] ...\n\n", OPENADDR)
 }
 
 func delOldEmailsByTime(deltime, period time.Duration) {
@@ -116,7 +116,7 @@ func emailSendPage(w http.ResponseWriter, r *http.Request) {
 			pasw := gp.HashSum([]byte(conn[1]))
 			req.Macp = gp.Base64Encode(gp.EncryptAES(pasw, hash))
 			resp, err := HTCLIENT.Post(
-				"http://"+addr+"/email/send",
+				addr+"/email/send",
 				"application/json",
 				bytes.NewReader(serialize(req)),
 			)

@@ -1,6 +1,7 @@
-client
-client.exe
+client_*_*
+server_*_*
 client.db
-server
-server.exe
 server.db
+client
+server
+compile
