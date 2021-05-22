@@ -609,7 +609,7 @@ func checkConnection(conn [2]string) (int, string) {
 	pasw := gp.HashSum([]byte(conn[1]))
 	macp := gp.EncryptAES(pasw, []byte(TMESSAGE))
 	resp, err := HTCLIENT.Post(
-		"http://"+conn[0]+"/",
+		conn[0]+"/",
 		"application/json",
 		bytes.NewReader(serialize(Req{
 			Macp: gp.Base64Encode(macp),
