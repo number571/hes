@@ -2,6 +2,11 @@
 #include <string.h>
 #include <stdlib.h>
 
+#ifdef _WIN32
+	#include <windows.h>
+	#include <winbase.h>
+#endif
+
 int main(void) {
 	const char *compiler = "go build";
 	const char *filenames[] = {"client", "server"};
@@ -18,15 +23,11 @@ int main(void) {
 	for (int k = 0; k < sizeof(filenames)/sizeof(filenames[0]); ++k) {
 		for (int i = 0; i < sizeof(platforms)/sizeof(platforms[0]); ++i) {
 			#ifdef _WIN32
-				snprintf(command, BUFSIZ, "set GOOS=%s", platforms[i]);
-				printf("%s\n", command);
-				system(command);
+				SetEnvironmentVariable("GOOS", platforms[i]);
 			#endif
 			for (int j = 0; j < sizeof(archs)/sizeof(archs[0]); ++j) {
 				#ifdef _WIN32
-					snprintf(command, BUFSIZ, "set GOARCH=%s", archs[j]);
-					printf("%s\n", command);
-					system(command);
+					SetEnvironmentVariable("GOARCH", archs[j]);
 				#endif
 				snprintf(retfile, BUFSIZ, "%s_%s_%s", filenames[k], platforms[i], archs[j]);
 				if (strcmp(platforms[i], "windows") == 0) {

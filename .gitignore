@@ -5,3 +5,4 @@ server.db
 client
 server
 compile
+*.exe
