@@ -293,7 +293,7 @@ func networkPage(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if r.Method == "GET" && r.FormValue("page") != "" {
-		num, err := strconv.Atoi(r.FormValue("num"))
+		num, err := strconv.Atoi(r.FormValue("page"))
 		if err != nil {
 			retcod, result = makeResult(RET_DANGER, "error: parse atoi")
 			goto close
@@ -609,7 +609,7 @@ func checkConnection(conn [2]string) (int, string) {
 	pasw := gp.HashSum([]byte(conn[1]))
 	macp := gp.EncryptAES(pasw, []byte(TMESSAGE))
 	resp, err := HTCLIENT.Post(
-		conn[0]+"/",
+		strings.TrimRight(conn[0], " /")+"/",
 		"application/json",
 		bytes.NewReader(serialize(Req{
 			Macp: gp.Base64Encode(macp),
@@ -647,7 +647,7 @@ func writeEmails(addr string, rdata []byte) {
 	}
 	var servresp Resp
 	resp, err := HTCLIENT.Post(
-		addr+"/email/send",
+		strings.TrimRight(addr, " /")+"/email/send",
 		"application/json",
 		bytes.NewReader(rdata),
 	)
@@ -681,7 +681,7 @@ func readEmails(user *User, addr string) {
 	pbhash := gp.HashPublicKey(client.PublicKey())
 	// GET SIZE EMAILS
 	resp, err := HTCLIENT.Post(
-		addr+"/email/recv",
+		strings.TrimRight(addr, " /")+"/email/recv",
 		"application/json",
 		bytes.NewReader(serialize(Req{
 			Recv: pbhash,
@@ -709,7 +709,7 @@ func readEmails(user *User, addr string) {
 	}
 	for i, count := 1, 0; i <= size; i++ {
 		resp, err := HTCLIENT.Post(
-			addr+"/email/recv",
+			strings.TrimRight(addr, " /")+"/email/recv",
 			"application/json",
 			bytes.NewReader(serialize(Req{
 				Recv: pbhash,

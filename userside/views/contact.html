@@ -34,15 +34,17 @@
     {{ range $key, $value := .Contacts }}
 		<div class="form-group row">
 			<div class="col-md-6 w-50">
-				<button type="button" class="btn btn-secondary divtext w-100" disabled>{{ $key }}</button>
+				<button type="button" class="btn btn-secondary w-100" disabled>
+					<div class="text-truncate">{{ $key }}</div>
+				</button>
 			</div>
 			<div class="col-md-3 w-25">
-				<button type="button" class="btn btn-success w-100" onclick="copy_text('public_key_' + '{{ $key }}')">Copy</button>
+				<button type="button" class="btn btn-success text-truncate w-100" onclick="copy_text('public_key_' + '{{ $key }}')">Copy</button>
 			</div>
 			<div class="col-md-3 w-25">
 				<form class="text-center" method="POST" action="/network/contact">
 					<input type="hidden" name="public_key" value="{{ $value }}">
-					<input type="submit" name="delete" value="Delete" class="btn btn-danger w-100">
+					<input type="submit" name="delete" value="Delete" class="btn btn-danger text-truncate w-100">
 				</form>
 			</div>
 		</div>

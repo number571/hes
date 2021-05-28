@@ -3,6 +3,16 @@
 {{ end }}
 
 {{ define "main" }}
+	<div class="alert alert-warning" role="alert">
+        <button type="button" class="close" data-dismiss="alert" aria-label="Close">
+            <span aria-hidden="true">&times;</span>
+        </button>
+    	<div>
+            Template of connection:
+            <br>
+            proto://addr.domen:port
+        </div>
+    </div>
 	<form class="text-center" method="POST" action="/network/connect">
 		<div class="form-group">
 			<input type="submit" name="check" value="Check connections" class="btn btn-info w-100">
@@ -22,12 +32,14 @@
 	{{ range .Connects }}
 		<div class="form-group row">
 			<div class="col-md-9 w-75">
-				<button type="button" class="btn btn-secondary divtext w-100" disabled>{{ index . 0 }}</button>
+				<button type="button" class="btn btn-secondary divtext w-100" disabled>
+					<div class="text-truncate">{{ index . 0 }}</div>
+				</button>
 			</div>
 			<div class="col-md-3 w-25">
 				<form class="text-center" method="POST" action="/network/connect">
 					<input type="hidden" name="hostname" value="{{ index . 0 }}">
-					<input type="submit" name="delete" value="Delete" class="btn btn-danger w-100">
+					<input type="submit" name="delete" value="Delete" class="btn btn-danger text-truncate w-100">
 				</form>
 			</div>
 		</div>
