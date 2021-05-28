@@ -4,7 +4,6 @@
 
 #ifdef _WIN32
 	#include <windows.h>
-	#include <winbase.h>
 #endif
 
 int main(void) {
@@ -24,10 +23,12 @@ int main(void) {
 		for (int i = 0; i < sizeof(platforms)/sizeof(platforms[0]); ++i) {
 			#ifdef _WIN32
 				SetEnvironmentVariable("GOOS", platforms[i]);
+				printf("set GOOS=%s\n", platforms[i]);
 			#endif
 			for (int j = 0; j < sizeof(archs)/sizeof(archs[0]); ++j) {
 				#ifdef _WIN32
 					SetEnvironmentVariable("GOARCH", archs[j]);
+					printf("set GOARCH=%s\n", archs[j]);
 				#endif
 				snprintf(retfile, BUFSIZ, "%s_%s_%s", filenames[k], platforms[i], archs[j]);
 				if (strcmp(platforms[i], "windows") == 0) {
