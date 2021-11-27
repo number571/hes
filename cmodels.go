@@ -1,10 +1,11 @@
 package main
 
 import (
-	"crypto/rsa"
 	"database/sql"
-	_ "github.com/mattn/go-sqlite3"
 	"sync"
+
+	_ "github.com/mattn/go-sqlite3"
+	cr "github.com/number571/gopeer/crypto"
 )
 
 type DB struct {
@@ -21,7 +22,7 @@ type User struct {
 	Id   int
 	Name string
 	Pasw []byte
-	Priv *rsa.PrivateKey
+	Priv cr.PrivKey
 }
 
 type Email struct {

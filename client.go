@@ -4,9 +4,6 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"github.com/boombuler/barcode"
-	"github.com/boombuler/barcode/qr"
-	gp "github.com/number571/gopeer"
 	"html/template"
 	"image/png"
 	"io/ioutil"
@@ -15,6 +12,13 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/boombuler/barcode"
+	"github.com/boombuler/barcode/qr"
+	gp "github.com/number571/gopeer"
+	cr "github.com/number571/gopeer/crypto"
+	en "github.com/number571/gopeer/encoding"
+	lc "github.com/number571/gopeer/local"
 )
 
 type TemplateResult struct {
@@ -118,7 +122,7 @@ func signupPage(w http.ResponseWriter, r *http.Request) {
 		name := r.FormValue("username")
 		pasw := r.FormValue("password")
 		spriv := r.FormValue("private_key")
-		priv := gp.StringToPrivateKey(spriv)
+		priv := cr.LoadPrivKeyByString(spriv)
 		if pasw != r.FormValue("password_repeat") {
 			retcod, result = makeResult(RET_DANGER, "error: passwords not equal")
 			goto close
@@ -128,7 +132,7 @@ func signupPage(w http.ResponseWriter, r *http.Request) {
 			goto close
 		}
 		if priv == nil {
-			priv = gp.GenerateKey(gp.Get("AKEY_SIZE").(uint))
+			priv = cr.NewPrivKey(gp.Get("AKEY_SIZE").(uint))
 		}
 		err := DATABASE.SetUser(name, pasw, priv)
 		if err != nil {
@@ -222,8 +226,8 @@ close:
 			Result: result,
 			Return: retcod,
 		},
-		PublicKey:  gp.PublicKeyToString(&user.Priv.PublicKey),
-		PrivateKey: gp.PrivateKeyToString(user.Priv),
+		PublicKey:  user.Priv.PubKey().String(),
+		PrivateKey: user.Priv.String(),
 	})
 }
 
@@ -233,7 +237,7 @@ func accountPublicKeyPage(w http.ResponseWriter, r *http.Request) {
 		fmt.Fprint(w, "error: session is null")
 		return
 	}
-	dataString := gp.PublicKeyToString(&user.Priv.PublicKey)
+	dataString := user.Priv.PubKey().String()
 	qrCode, err := qr.Encode(dataString, qr.Q, qr.Auto)
 	if err != nil {
 		fmt.Fprint(w, "error: qrcode generate")
@@ -253,13 +257,13 @@ func accountPrivateKeyPage(w http.ResponseWriter, r *http.Request) {
 		fmt.Fprint(w, "error: session is null")
 		return
 	}
-	dataString := gp.PrivateKeyToString(user.Priv)
-	qrCode, err := qr.Encode(dataString, qr.Q, qr.Auto)
+	dataString := user.Priv.String()
+	qrCode, err := qr.Encode(dataString, qr.L, qr.Auto)
 	if err != nil {
 		fmt.Fprint(w, "error: qrcode generate")
 		return
 	}
-	qrCode, err = barcode.Scale(qrCode, 768, 768)
+	qrCode, err = barcode.Scale(qrCode, 1024, 1024)
 	if err != nil {
 		fmt.Fprint(w, "error: qrcode scale")
 		return
@@ -359,7 +363,7 @@ func networkWritePage(w http.ResponseWriter, r *http.Request) {
 			retcod, result = makeResult(RET_DANGER, "error: max size")
 			goto close
 		}
-		recv := gp.StringToPublicKey(r.FormValue("receiver"))
+		recv := cr.LoadPubKeyByString(r.FormValue("receiver"))
 		if recv == nil {
 			retcod, result = makeResult(RET_DANGER, "error: receiver is null")
 			goto close
@@ -384,24 +388,24 @@ func networkWritePage(w http.ResponseWriter, r *http.Request) {
 			}
 			file.Close()
 			head += FSEPARAT + files[i].Filename
-			body += FSEPARAT + gp.Base64Encode(content)
+			body += FSEPARAT + en.Base64Encode(content)
 		}
-		client := gp.NewClient(user.Priv, nil)
-		pack := client.Encrypt(
-			recv, newEmail(user.Name, head, body), POWSDIFF)
+		client := lc.NewClient(user.Priv)
+		pack := client.Encrypt(recv, newEmail(user.Name, head, body))
 		hash := pack.Body.Hash
 		conns := DATABASE.GetConns(user)
 		req := Req{
-			Recv: gp.HashPublicKey(recv),
-			Data: string(gp.SerializePackage(pack)),
+			Recv: string(recv.Address()),
+			Data: string(pack.Serialize()),
 		}
 		if uint(len(req.Data)) > MAXESIZE {
 			retcod, result = makeResult(RET_DANGER, "error: max size")
 			goto close
 		}
 		for _, conn := range conns {
-			pasw := gp.HashSum([]byte(conn[1]))
-			req.Macp = gp.Base64Encode(gp.EncryptAES(pasw, hash))
+			pasw := cr.NewSHA256([]byte(conn[1])).Bytes()
+			cipher := cr.NewCipher(pasw)
+			req.Macp = en.Base64Encode(cipher.Encrypt(hash))
 			go writeEmails(conn[0], serialize(req))
 		}
 		result = "success: email send"
@@ -441,12 +445,12 @@ func networkReadPage(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if r.Method == "POST" {
-		pub := gp.StringToPublicKey(r.FormValue("public_key"))
+		pub := cr.LoadPubKeyByString(r.FormValue("public_key"))
 		if pub == nil {
 			fmt.Fprint(w, "error: public key is null")
 			return
 		}
-		dataString := gp.PublicKeyToString(pub)
+		dataString := pub.String()
 		qrCode, err := qr.Encode(dataString, qr.Q, qr.Auto)
 		if err != nil {
 			fmt.Fprint(w, "error: qrcode generate")
@@ -506,7 +510,7 @@ func networkContactPage(w http.ResponseWriter, r *http.Request) {
 	}
 	if r.Method == "POST" && r.FormValue("append") != "" {
 		name := r.FormValue("nickname")
-		publ := gp.StringToPublicKey(r.FormValue("public_key"))
+		publ := cr.LoadPubKeyByString(r.FormValue("public_key"))
 		err := DATABASE.SetContact(user, name, publ)
 		if err != nil {
 			retcod, result = makeResult(RET_DANGER,
@@ -515,7 +519,7 @@ func networkContactPage(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	if r.Method == "POST" && r.FormValue("delete") != "" {
-		publ := gp.StringToPublicKey(r.FormValue("public_key"))
+		publ := cr.LoadPubKeyByString(r.FormValue("public_key"))
 		err := DATABASE.DelContact(user, publ)
 		if err != nil {
 			retcod, result = makeResult(RET_DANGER,
@@ -606,13 +610,14 @@ func checkConnection(conn [2]string) (int, string) {
 		Macp string `json:"macp"`
 	}
 	var servresp Resp
-	pasw := gp.HashSum([]byte(conn[1]))
-	macp := gp.EncryptAES(pasw, []byte(TMESSAGE))
+	pasw := cr.NewSHA256([]byte(conn[1])).Bytes()
+	cipher := cr.NewCipher(pasw)
+	macp := cipher.Encrypt([]byte(TMESSAGE))
 	resp, err := HTCLIENT.Post(
 		strings.TrimRight(conn[0], " /")+"/",
 		"application/json",
 		bytes.NewReader(serialize(Req{
-			Macp: gp.Base64Encode(macp),
+			Macp: en.Base64Encode(macp),
 		})),
 	)
 	if err != nil {
@@ -677,8 +682,8 @@ func readEmails(user *User, addr string) {
 		Data int    `json:"data"`
 	}
 	var servresp Resp
-	client := gp.NewClient(user.Priv, nil)
-	pbhash := gp.HashPublicKey(client.PublicKey())
+	client := lc.NewClient(user.Priv)
+	pbhash := string(client.PubKey().Address())
 	// GET SIZE EMAILS
 	resp, err := HTCLIENT.Post(
 		strings.TrimRight(addr, " /")+"/email/recv",
@@ -730,11 +735,11 @@ func readEmails(user *User, addr string) {
 		if servresp.Return != 0 {
 			continue
 		}
-		pack := gp.DeserializePackage([]byte(servresp.Result))
+		pack := lc.Package(servresp.Result).Deserialize()
 		if pack == nil {
 			continue
 		}
-		pack = client.Decrypt(pack, POWSDIFF)
+		pack = client.Decrypt(pack)
 		if pack == nil {
 			continue
 		}
@@ -770,12 +775,12 @@ func getFiles(email *Email) [][2]string {
 	return list
 }
 
-func newEmail(sender, head, body string) *gp.Package {
-	return gp.NewPackage(IS_EMAIL, serialize(Email{
+func newEmail(sender, head, body string) *lc.Message {
+	return lc.NewMessage([]byte(IS_EMAIL), serialize(Email{
 		SenderName: sender,
 		Head:       head,
 		Body:       body,
-	}))
+	}), POWSDIFF)
 }
 
 func getName(user *User) string {

@@ -2,10 +2,12 @@ package main
 
 import (
 	"database/sql"
-	_ "github.com/mattn/go-sqlite3"
-	gp "github.com/number571/gopeer"
 	"sync"
 	"time"
+
+	_ "github.com/mattn/go-sqlite3"
+	en "github.com/number571/gopeer/encoding"
+	lc "github.com/number571/gopeer/local"
 )
 
 type DB struct {
@@ -37,14 +39,14 @@ CREATE TABLE IF NOT EXISTS emails (
 	}
 }
 
-func (db *DB) SetEmail(recv string, pack *gp.Package) error {
+func (db *DB) SetEmail(recv string, pack *lc.Message) error {
 	db.mtx.Lock()
 	defer db.mtx.Unlock()
 	_, err := db.ptr.Exec(
 		"INSERT INTO emails (recv, hash, data) VALUES ($1, $2, $3)",
 		recv,
-		gp.Base64Encode(pack.Body.Hash),
-		string(gp.SerializePackage(pack)),
+		en.Base64Encode(pack.Body.Hash),
+		string(pack.Serialize()),
 	)
 	return err
 }

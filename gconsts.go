@@ -1,13 +1,14 @@
 package main
 
 import (
-	"flag"
-	gp "github.com/number571/gopeer"
-	"golang.org/x/net/proxy"
-	"net/http"
 	"encoding/json"
+	"flag"
+	"net/http"
 	"net/url"
 	"time"
+
+	gp "github.com/number571/gopeer"
+	"golang.org/x/net/proxy"
 )
 
 const (

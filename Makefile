@@ -1,7 +1,7 @@
 CC=gcc
 GC=go build
 GFILES=client.go cdatabase.go cmodels.go csessions.go gconsts.go server.go sdatabase.go sconfig.go
-.PHONY: default build clean
+.PHONY: default build build_all clean
 default: build
 build: $(GFILES)
 	$(GC) client.go gconsts.go cdatabase.go cmodels.go csessions.go

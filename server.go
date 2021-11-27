@@ -4,9 +4,12 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	gp "github.com/number571/gopeer"
 	"net/http"
 	"time"
+
+	cr "github.com/number571/gopeer/crypto"
+	en "github.com/number571/gopeer/encoding"
+	lc "github.com/number571/gopeer/local"
 )
 
 var (
@@ -61,8 +64,9 @@ func indexPage(w http.ResponseWriter, r *http.Request) {
 		response(w, 2, "error: parse json")
 		return
 	}
-	pasw := gp.HashSum([]byte(FLCONFIG.Pasw))
-	dect := gp.DecryptAES(pasw, gp.Base64Decode(req.Macp))
+	pasw := cr.NewSHA256([]byte(FLCONFIG.Pasw)).Bytes()
+	cipher := cr.NewCipher(pasw)
+	dect := cipher.Decrypt(en.Base64Decode(req.Macp))
 	if !bytes.Equal([]byte(TMESSAGE), dect) {
 		response(w, 3, "error: message authentication code")
 		return
@@ -89,18 +93,20 @@ func emailSendPage(w http.ResponseWriter, r *http.Request) {
 		response(w, 3, "error: parse json")
 		return
 	}
-	pack := gp.DeserializePackage([]byte(req.Data))
+	pack := lc.Package(req.Data).Deserialize()
 	if pack == nil {
 		response(w, 4, "error: deserialize package")
 		return
 	}
 	hash := pack.Body.Hash
-	if !gp.ProofIsValid(hash, POWSDIFF, pack.Body.Npow) {
+	puzzle := cr.NewPuzzle(uint8(POWSDIFF))
+	if !puzzle.Verify(hash, pack.Body.Npow) {
 		response(w, 5, "error: proof of work")
 		return
 	}
-	pasw := gp.HashSum([]byte(FLCONFIG.Pasw))
-	dech := gp.DecryptAES(pasw, gp.Base64Decode(req.Macp))
+	pasw := cr.NewSHA256([]byte(FLCONFIG.Pasw)).Bytes()
+	cipher := cr.NewCipher(pasw)
+	dech := cipher.Decrypt(en.Base64Decode(req.Macp))
 	if !bytes.Equal(hash, dech) {
 		response(w, 6, "error: message authentication code")
 		return
@@ -113,8 +119,9 @@ func emailSendPage(w http.ResponseWriter, r *http.Request) {
 	for _, conn := range FLCONFIG.Conns {
 		go func() {
 			addr := conn[0]
-			pasw := gp.HashSum([]byte(conn[1]))
-			req.Macp = gp.Base64Encode(gp.EncryptAES(pasw, hash))
+			pasw := cr.NewSHA256([]byte(conn[1])).Bytes()
+			cipher := cr.NewCipher(pasw)
+			req.Macp = en.Base64Encode(cipher.Encrypt(hash))
 			resp, err := HTCLIENT.Post(
 				addr+"/email/send",
 				"application/json",
