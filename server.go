@@ -7,9 +7,9 @@ import (
 	"net/http"
 	"time"
 
-	cr "github.com/number571/gopeer/crypto"
-	en "github.com/number571/gopeer/encoding"
-	lc "github.com/number571/gopeer/local"
+	cr "github.com/number571/go-peer/crypto"
+	en "github.com/number571/go-peer/encoding"
+	lc "github.com/number571/go-peer/local"
 )
 
 var (

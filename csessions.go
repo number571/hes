@@ -4,8 +4,8 @@ import (
 	"net/http"
 	"time"
 
-	gp "github.com/number571/gopeer"
-	cr "github.com/number571/gopeer/crypto"
+	cr "github.com/number571/go-peer/crypto"
+	gp "github.com/number571/go-peer/settings"
 )
 
 type sessionData struct {

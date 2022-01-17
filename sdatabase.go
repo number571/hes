@@ -6,8 +6,8 @@ import (
 	"time"
 
 	_ "github.com/mattn/go-sqlite3"
-	en "github.com/number571/gopeer/encoding"
-	lc "github.com/number571/gopeer/local"
+	en "github.com/number571/go-peer/encoding"
+	lc "github.com/number571/go-peer/local"
 )
 
 type DB struct {

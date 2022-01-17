@@ -5,7 +5,7 @@ import (
 	"sync"
 
 	_ "github.com/mattn/go-sqlite3"
-	cr "github.com/number571/gopeer/crypto"
+	cr "github.com/number571/go-peer/crypto"
 )
 
 type DB struct {

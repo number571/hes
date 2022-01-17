@@ -7,7 +7,7 @@ import (
 	"net/url"
 	"time"
 
-	gp "github.com/number571/gopeer"
+	gp "github.com/number571/go-peer/settings"
 	"golang.org/x/net/proxy"
 )
 

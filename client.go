@@ -15,10 +15,10 @@ import (
 
 	"github.com/boombuler/barcode"
 	"github.com/boombuler/barcode/qr"
-	gp "github.com/number571/gopeer"
-	cr "github.com/number571/gopeer/crypto"
-	en "github.com/number571/gopeer/encoding"
-	lc "github.com/number571/gopeer/local"
+	cr "github.com/number571/go-peer/crypto"
+	en "github.com/number571/go-peer/encoding"
+	lc "github.com/number571/go-peer/local"
+	gp "github.com/number571/go-peer/settings"
 )
 
 type TemplateResult struct {
