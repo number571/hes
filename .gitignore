@@ -1,8 +1,6 @@
-client_*_*
-server_*_*
-client.db
-server.db
-client
-server
-compile
-*.exe
+c-hes
+c-hes.db
+
+s-hes
+s-hes.db
+s-hes.cfg

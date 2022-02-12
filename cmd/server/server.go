@@ -7,20 +7,23 @@ import (
 	"net/http"
 	"time"
 
+	st "github.com/number571/hes/settings"
+
 	cr "github.com/number571/go-peer/crypto"
 	en "github.com/number571/go-peer/encoding"
 	lc "github.com/number571/go-peer/local"
+	gp "github.com/number571/go-peer/settings"
 )
 
 var (
-	DATABASE = NewDB("server.db")
-	FLCONFIG = NewCFG("server.cfg")
+	DATABASE = NewDB("s-hes.db")
+	FLCONFIG = NewCFG("s-hes.cfg")
 )
 
 func init() {
 	go delOldEmailsByTime(24*time.Hour, 6*time.Hour)
-	hesDefaultInit("localhost:8080")
-	fmt.Printf("Server is listening [%s] ...\n\n", OPENADDR)
+	st.HesDefaultInit("localhost:8080")
+	fmt.Printf("Server is listening [%s] ...\n\n", st.OPENADDR)
 }
 
 func delOldEmailsByTime(deltime, period time.Duration) {
@@ -34,17 +37,7 @@ func main() {
 	http.HandleFunc("/", indexPage)
 	http.HandleFunc("/email/send", emailSendPage)
 	http.HandleFunc("/email/recv", emailRecvPage)
-	http.ListenAndServe(OPENADDR, nil)
-}
-
-func help() string {
-	return `
-1. exit   - close server;
-2. help   - commands info;
-3. list   - list connections;
-4. append - append connect to list;
-5. delete - delete connect from list;
-`
+	http.ListenAndServe(st.OPENADDR, nil)
 }
 
 func indexPage(w http.ResponseWriter, r *http.Request) {
@@ -55,7 +48,7 @@ func indexPage(w http.ResponseWriter, r *http.Request) {
 		response(w, 0, "hidden email service")
 		return
 	}
-	if r.ContentLength > int64(MAXESIZE) {
+	if r.ContentLength > int64(st.SETTINGS.Get(gp.SizePack)) {
 		response(w, 1, "error: max size")
 		return
 	}
@@ -64,10 +57,10 @@ func indexPage(w http.ResponseWriter, r *http.Request) {
 		response(w, 2, "error: parse json")
 		return
 	}
-	pasw := cr.NewSHA256([]byte(FLCONFIG.Pasw)).Bytes()
+	pasw := cr.NewHasher([]byte(FLCONFIG.Pasw)).Bytes()
 	cipher := cr.NewCipher(pasw)
 	dect := cipher.Decrypt(en.Base64Decode(req.Macp))
-	if !bytes.Equal([]byte(TMESSAGE), dect) {
+	if !bytes.Equal(en.Uint64ToBytes(st.SETTINGS.Get(gp.MaskRout)), dect) {
 		response(w, 3, "error: message authentication code")
 		return
 	}
@@ -84,7 +77,7 @@ func emailSendPage(w http.ResponseWriter, r *http.Request) {
 		response(w, 1, "error: method != POST")
 		return
 	}
-	if r.ContentLength > int64(MAXESIZE) {
+	if r.ContentLength > int64(st.SETTINGS.Get(gp.SizePack)) {
 		response(w, 2, "error: max size")
 		return
 	}
@@ -99,12 +92,12 @@ func emailSendPage(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	hash := pack.Body.Hash
-	puzzle := cr.NewPuzzle(uint8(POWSDIFF))
+	puzzle := cr.NewPuzzle(st.SETTINGS.Get(gp.SizeWork))
 	if !puzzle.Verify(hash, pack.Body.Npow) {
 		response(w, 5, "error: proof of work")
 		return
 	}
-	pasw := cr.NewSHA256([]byte(FLCONFIG.Pasw)).Bytes()
+	pasw := cr.NewHasher([]byte(FLCONFIG.Pasw)).Bytes()
 	cipher := cr.NewCipher(pasw)
 	dech := cipher.Decrypt(en.Base64Decode(req.Macp))
 	if !bytes.Equal(hash, dech) {
@@ -117,21 +110,21 @@ func emailSendPage(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	for _, conn := range FLCONFIG.Conns {
-		go func() {
+		go func(conn [2]string) {
 			addr := conn[0]
-			pasw := cr.NewSHA256([]byte(conn[1])).Bytes()
+			pasw := cr.NewHasher([]byte(conn[1])).Bytes()
 			cipher := cr.NewCipher(pasw)
 			req.Macp = en.Base64Encode(cipher.Encrypt(hash))
-			resp, err := HTCLIENT.Post(
+			resp, err := st.HTCLIENT.Post(
 				addr+"/email/send",
 				"application/json",
-				bytes.NewReader(serialize(req)),
+				bytes.NewReader(st.Serialize(req)),
 			)
 			if err != nil {
 				return
 			}
 			resp.Body.Close()
-		}()
+		}(conn)
 	}
 	response(w, 0, "success: email saved")
 }
@@ -145,7 +138,7 @@ func emailRecvPage(w http.ResponseWriter, r *http.Request) {
 		response(w, 1, "error: method != POST")
 		return
 	}
-	if r.ContentLength > int64(MAXESIZE) {
+	if r.ContentLength > int64(st.SETTINGS.Get(gp.SizePack)) {
 		response(w, 2, "error: max size")
 		return
 	}

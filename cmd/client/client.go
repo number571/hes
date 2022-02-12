@@ -19,6 +19,8 @@ import (
 	en "github.com/number571/go-peer/encoding"
 	lc "github.com/number571/go-peer/local"
 	gp "github.com/number571/go-peer/settings"
+
+	st "github.com/number571/hes/settings"
 )
 
 type TemplateResult struct {
@@ -45,14 +47,14 @@ const (
 )
 
 var (
-	DATABASE = NewDB("client.db")
+	DATABASE = NewDB("s-hes.db")
 	SESSIONS = NewSessions()
 )
 
 func init() {
 	go delOldSessionsByTime(1*time.Hour, 15*time.Minute)
-	hesDefaultInit("localhost:7545")
-	fmt.Printf("Client is listening [%s] ...\n\n", OPENADDR)
+	st.HesDefaultInit("localhost:7545")
+	fmt.Printf("Client is listening [%s] ...\n\n", st.OPENADDR)
 }
 
 func delOldSessionsByTime(deltime, period time.Duration) {
@@ -79,7 +81,7 @@ func main() {
 	http.HandleFunc("/network/write", networkWritePage)
 	http.HandleFunc("/network/contact", networkContactPage)
 	http.HandleFunc("/network/connect", networkConnectPage)
-	http.ListenAndServe(OPENADDR, nil)
+	http.ListenAndServe(st.OPENADDR, nil)
 }
 
 func handleFileServer(fs http.FileSystem) http.Handler {
@@ -115,7 +117,7 @@ func signupPage(w http.ResponseWriter, r *http.Request) {
 		panic("error: load signup.html")
 	}
 	if SESSIONS.Get(r) != nil {
-		http.Redirect(w, r, "/", 302)
+		http.Redirect(w, r, "/", http.StatusFound)
 		return
 	}
 	if r.Method == "POST" {
@@ -132,7 +134,7 @@ func signupPage(w http.ResponseWriter, r *http.Request) {
 			goto close
 		}
 		if priv == nil {
-			priv = cr.NewPrivKey(gp.Get("AKEY_SIZE").(uint))
+			priv = cr.NewPrivKey(st.AKEYSIZE)
 		}
 		err := DATABASE.SetUser(name, pasw, priv)
 		if err != nil {
@@ -140,7 +142,7 @@ func signupPage(w http.ResponseWriter, r *http.Request) {
 				fmt.Sprintf("error: %s", err.Error()))
 			goto close
 		}
-		http.Redirect(w, r, "/signin", 302)
+		http.Redirect(w, r, "/signin", http.StatusFound)
 		return
 	}
 close:
@@ -160,7 +162,7 @@ func signinPage(w http.ResponseWriter, r *http.Request) {
 		panic("error: load signin.html")
 	}
 	if SESSIONS.Get(r) != nil {
-		http.Redirect(w, r, "/", 302)
+		http.Redirect(w, r, "/", http.StatusFound)
 		return
 	}
 	if r.Method == "POST" {
@@ -172,7 +174,7 @@ func signinPage(w http.ResponseWriter, r *http.Request) {
 			goto close
 		}
 		SESSIONS.Set(w, user)
-		http.Redirect(w, r, "/", 302)
+		http.Redirect(w, r, "/", http.StatusFound)
 		return
 	}
 close:
@@ -184,7 +186,7 @@ close:
 
 func signoutPage(w http.ResponseWriter, r *http.Request) {
 	SESSIONS.Del(w, r)
-	http.Redirect(w, r, "/", 302)
+	http.Redirect(w, r, "/", http.StatusFound)
 }
 
 func accountPage(w http.ResponseWriter, r *http.Request) {
@@ -203,7 +205,7 @@ func accountPage(w http.ResponseWriter, r *http.Request) {
 	}
 	user := SESSIONS.Get(r)
 	if user == nil {
-		http.Redirect(w, r, "/", 302)
+		http.Redirect(w, r, "/", http.StatusFound)
 		return
 	}
 	if r.Method == "POST" && r.FormValue("delete") != "" {
@@ -216,7 +218,7 @@ func accountPage(w http.ResponseWriter, r *http.Request) {
 		}
 		SESSIONS.Del(w, r)
 		DATABASE.DelUser(cuser)
-		http.Redirect(w, r, "/", 302)
+		http.Redirect(w, r, "/", http.StatusFound)
 		return
 	}
 close:
@@ -293,7 +295,7 @@ func networkPage(w http.ResponseWriter, r *http.Request) {
 	t = template.Must(t, err)
 	user := SESSIONS.Get(r)
 	if user == nil {
-		http.Redirect(w, r, "/", 302)
+		http.Redirect(w, r, "/", http.StatusFound)
 		return
 	}
 	if r.Method == "GET" && r.FormValue("page") != "" {
@@ -335,10 +337,6 @@ func networkWritePage(w http.ResponseWriter, r *http.Request) {
 		TemplateResult
 		Contacts map[string]string
 	}
-	type Resp struct {
-		Result string `json:"result"`
-		Return int    `json:"return"`
-	}
 	type Req struct {
 		Recv string `json:"recv"`
 		Data string `json:"data"`
@@ -354,11 +352,11 @@ func networkWritePage(w http.ResponseWriter, r *http.Request) {
 	}
 	user := SESSIONS.Get(r)
 	if user == nil {
-		http.Redirect(w, r, "/", 302)
+		http.Redirect(w, r, "/", http.StatusFound)
 		return
 	}
 	if r.Method == "POST" {
-		err := r.ParseMultipartForm(int64(MAXESIZE))
+		err := r.ParseMultipartForm(int64(st.SETTINGS.Get(gp.SizePack)))
 		if err != nil {
 			retcod, result = makeResult(RET_DANGER, "error: max size")
 			goto close
@@ -390,23 +388,26 @@ func networkWritePage(w http.ResponseWriter, r *http.Request) {
 			head += FSEPARAT + files[i].Filename
 			body += FSEPARAT + en.Base64Encode(content)
 		}
-		client := lc.NewClient(user.Priv)
-		pack := client.Encrypt(recv, newEmail(user.Name, head, body))
+		client := lc.NewClient(user.Priv, st.SETTINGS)
+		pack, _ := client.Encrypt(
+			lc.NewRoute(recv, nil, nil),
+			newEmail(user.Name, head, body),
+		)
 		hash := pack.Body.Hash
 		conns := DATABASE.GetConns(user)
 		req := Req{
 			Recv: string(recv.Address()),
 			Data: string(pack.Serialize()),
 		}
-		if uint(len(req.Data)) > MAXESIZE {
+		if uint64(len(req.Data)) > st.SETTINGS.Get(gp.SizePack) {
 			retcod, result = makeResult(RET_DANGER, "error: max size")
 			goto close
 		}
 		for _, conn := range conns {
-			pasw := cr.NewSHA256([]byte(conn[1])).Bytes()
+			pasw := cr.NewHasher([]byte(conn[1])).Bytes()
 			cipher := cr.NewCipher(pasw)
 			req.Macp = en.Base64Encode(cipher.Encrypt(hash))
-			go writeEmails(conn[0], serialize(req))
+			go writeEmails(conn[0], st.Serialize(req))
 		}
 		result = "success: email send"
 	}
@@ -441,7 +442,7 @@ func networkReadPage(w http.ResponseWriter, r *http.Request) {
 	t = template.Must(t, err)
 	user := SESSIONS.Get(r)
 	if user == nil {
-		http.Redirect(w, r, "/", 302)
+		http.Redirect(w, r, "/", http.StatusFound)
 		return
 	}
 	if r.Method == "POST" {
@@ -502,7 +503,7 @@ func networkContactPage(w http.ResponseWriter, r *http.Request) {
 	}
 	user := SESSIONS.Get(r)
 	if user == nil {
-		http.Redirect(w, r, "/", 302)
+		http.Redirect(w, r, "/", http.StatusFound)
 		return
 	}
 	if r.Method == "POST" && r.FormValue("switchf2f") != "" {
@@ -554,7 +555,7 @@ func networkConnectPage(w http.ResponseWriter, r *http.Request) {
 	}
 	user := SESSIONS.Get(r)
 	if user == nil {
-		http.Redirect(w, r, "/", 302)
+		http.Redirect(w, r, "/", http.StatusFound)
 		return
 	}
 	if r.Method == "POST" && r.FormValue("check") != "" {
@@ -610,13 +611,13 @@ func checkConnection(conn [2]string) (int, string) {
 		Macp string `json:"macp"`
 	}
 	var servresp Resp
-	pasw := cr.NewSHA256([]byte(conn[1])).Bytes()
+	pasw := cr.NewHasher([]byte(conn[1])).Bytes()
 	cipher := cr.NewCipher(pasw)
-	macp := cipher.Encrypt([]byte(TMESSAGE))
-	resp, err := HTCLIENT.Post(
+	macp := cipher.Encrypt(en.Uint64ToBytes(st.SETTINGS.Get(gp.MaskRout)))
+	resp, err := st.HTCLIENT.Post(
 		strings.TrimRight(conn[0], " /")+"/",
 		"application/json",
-		bytes.NewReader(serialize(Req{
+		bytes.NewReader(st.Serialize(Req{
 			Macp: en.Base64Encode(macp),
 		})),
 	)
@@ -624,7 +625,7 @@ func checkConnection(conn [2]string) (int, string) {
 		return makeResult(RET_DANGER,
 			fmt.Sprintf("%s='%s';\n", conn[0], "error: connect"))
 	}
-	if resp.ContentLength > int64(MAXESIZE) {
+	if resp.ContentLength > int64(st.SETTINGS.Get(gp.SizePack)) {
 		return makeResult(RET_DANGER,
 			fmt.Sprintf("%s='%s';\n", conn[0], "error: max size"))
 	}
@@ -646,12 +647,8 @@ func writeEmails(addr string, rdata []byte) {
 		Result string `json:"result"`
 		Return int    `json:"return"`
 	}
-	type Req struct {
-		Recv string `json:"recv"`
-		Data int    `json:"data"`
-	}
 	var servresp Resp
-	resp, err := HTCLIENT.Post(
+	resp, err := st.HTCLIENT.Post(
 		strings.TrimRight(addr, " /")+"/email/send",
 		"application/json",
 		bytes.NewReader(rdata),
@@ -659,7 +656,7 @@ func writeEmails(addr string, rdata []byte) {
 	if err != nil {
 		return
 	}
-	if resp.ContentLength > int64(MAXESIZE) {
+	if resp.ContentLength > int64(st.SETTINGS.Get(gp.SizePack)) {
 		return
 	}
 	err = json.NewDecoder(resp.Body).Decode(&servresp)
@@ -682,13 +679,13 @@ func readEmails(user *User, addr string) {
 		Data int    `json:"data"`
 	}
 	var servresp Resp
-	client := lc.NewClient(user.Priv)
+	client := lc.NewClient(user.Priv, st.SETTINGS)
 	pbhash := string(client.PubKey().Address())
 	// GET SIZE EMAILS
-	resp, err := HTCLIENT.Post(
+	resp, err := st.HTCLIENT.Post(
 		strings.TrimRight(addr, " /")+"/email/recv",
 		"application/json",
-		bytes.NewReader(serialize(Req{
+		bytes.NewReader(st.Serialize(Req{
 			Recv: pbhash,
 			Data: 0,
 		})),
@@ -696,7 +693,7 @@ func readEmails(user *User, addr string) {
 	if err != nil {
 		return
 	}
-	if resp.ContentLength > int64(MAXESIZE) {
+	if resp.ContentLength > int64(st.SETTINGS.Get(gp.SizePack)) {
 		return
 	}
 	err = json.NewDecoder(resp.Body).Decode(&servresp)
@@ -713,10 +710,10 @@ func readEmails(user *User, addr string) {
 		return
 	}
 	for i, count := 1, 0; i <= size; i++ {
-		resp, err := HTCLIENT.Post(
+		resp, err := st.HTCLIENT.Post(
 			strings.TrimRight(addr, " /")+"/email/recv",
 			"application/json",
-			bytes.NewReader(serialize(Req{
+			bytes.NewReader(st.Serialize(Req{
 				Recv: pbhash,
 				Data: i,
 			})),
@@ -724,7 +721,7 @@ func readEmails(user *User, addr string) {
 		if err != nil {
 			break
 		}
-		if resp.ContentLength > int64(MAXESIZE) {
+		if resp.ContentLength > int64(st.SETTINGS.Get(gp.SizePack)) {
 			break
 		}
 		err = json.NewDecoder(resp.Body).Decode(&servresp)
@@ -775,12 +772,12 @@ func getFiles(email *Email) [][2]string {
 	return list
 }
 
-func newEmail(sender, head, body string) *lc.Message {
-	return lc.NewMessage([]byte(IS_EMAIL), serialize(Email{
+func newEmail(sender, head, body string) lc.Message {
+	return lc.NewMessage([]byte(IS_EMAIL), st.Serialize(Email{
 		SenderName: sender,
 		Head:       head,
 		Body:       body,
-	}), POWSDIFF)
+	}))
 }
 
 func getName(user *User) string {

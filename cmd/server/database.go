@@ -39,7 +39,7 @@ CREATE TABLE IF NOT EXISTS emails (
 	}
 }
 
-func (db *DB) SetEmail(recv string, pack *lc.Message) error {
+func (db *DB) SetEmail(recv string, pack lc.Message) error {
 	db.mtx.Lock()
 	defer db.mtx.Unlock()
 	_, err := db.ptr.Exec(

@@ -6,6 +6,7 @@ import (
 
 	cr "github.com/number571/go-peer/crypto"
 	gp "github.com/number571/go-peer/settings"
+	st "github.com/number571/hes/settings"
 )
 
 type sessionData struct {
@@ -28,7 +29,7 @@ func (sessions *Sessions) Set(w http.ResponseWriter, user *User) {
 			break
 		}
 	}
-	key := cr.RandString(gp.Get("SALT_SIZE").(uint))
+	key := cr.RandString(st.SETTINGS.Get(gp.SizeSkey))
 	sessions.mpn[key] = &sessionData{
 		user: user,
 		ts:   time.Now(),

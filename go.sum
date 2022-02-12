@@ -2,8 +2,8 @@ github.com/boombuler/barcode v1.0.1 h1:NDBbPmhS+EqABEs5Kg3n/5ZNjy73Pz7SIV+KCeqyX
 github.com/boombuler/barcode v1.0.1/go.mod h1:paBWMcWSl3LHKBqUq+rly7CNSldXjb2rDl3JlRe0mD8=
 github.com/mattn/go-sqlite3 v1.14.10 h1:MLn+5bFRlWMGoSRmJour3CL1w/qL96mvipqpwQW/Sfk=
 github.com/mattn/go-sqlite3 v1.14.10/go.mod h1:NyWgC/yNuGj7Q9rpYnZvas74GogHl5/Z4A/KQRfk6bU=
-github.com/number571/go-peer v1.3.8 h1:Bb9Z9MiLqHm1vhRfaN8jMDoaa11f4StxwIuDHRj3hl4=
-github.com/number571/go-peer v1.3.8/go.mod h1:z676K6FsiJe+iZfMEltHhqF7N94CXwVzx+Tmsnp+3So=
+github.com/number571/go-peer v1.4.0 h1:WydB00bFZtozQsAFVZm4NiJvcNiHVj0PQANJkPQS+Yo=
+github.com/number571/go-peer v1.4.0/go.mod h1:z676K6FsiJe+iZfMEltHhqF7N94CXwVzx+Tmsnp+3So=
 golang.org/x/net v0.0.0-20220114011407-0dd24b26b47d h1:1n1fc535VhN8SYtD4cDUyNlfpAF2ROMM9+11equK3hs=
 golang.org/x/net v0.0.0-20220114011407-0dd24b26b47d/go.mod h1:9nx3DQGgdP8bBQD5qxJ1jj9UTztislL4KSBs9R2vV5Y=
 golang.org/x/sys v0.0.0-20201119102817-f84b799fce68/go.mod h1:h1NjWce9XRLGQEsW7wpKNCjG9DtNlClVuFLEZdDNbEs=

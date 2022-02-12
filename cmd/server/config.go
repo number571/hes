@@ -4,6 +4,8 @@ import (
 	"encoding/json"
 	"io/ioutil"
 	"os"
+
+	st "github.com/number571/hes/settings"
 )
 
 type CFG struct {
@@ -18,7 +20,7 @@ func NewCFG(filename string) *CFG {
 		"pasw",
 	})
 	if !fileIsExist(filename) {
-		err := ioutil.WriteFile(filename, serialize(config), 0644)
+		err := ioutil.WriteFile(filename, st.Serialize(config), 0644)
 		if err != nil {
 			return nil
 		}
