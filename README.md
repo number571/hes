@@ -1,4 +1,4 @@
-# HES
+# [DEPRECATED] HES
 
 > Hidden email service. Version 1.1.11.
 
