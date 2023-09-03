@@ -1,6 +1,8 @@
-# [DEPRECATED] HES
+# HES
 
 > Hidden email service. Version 1.1.11.
+>
+> Can be replaced by [HLT](https://github.com/number571/go-peer/tree/master/cmd/hidden_lake/traffic) application.
 
 ### Home page
 <img src="cmd/client/userside/images/HES1.png" alt="HomePage"/>
